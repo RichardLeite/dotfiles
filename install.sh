@@ -1,0 +1,442 @@
+#!/usr/bin/env bash
+
+#===============================================================================
+# dotfiles.sh - Dotfiles Management Script for Arch Linux with Hyprland
+#===============================================================================
+# This script helps manage dotfiles by:
+# 1. Initializing a dotfiles repository with existing configs
+# 2. Installing/symlinking dotfiles from the repository to the system
+# 3. Updating the repository with the latest local changes
+# 4. Backing up existing configs before overwriting
+#
+# Author: Richard C.
+# Created: June 2025
+#===============================================================================
+
+# Exit on error
+set -e
+
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Script variables
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_DIR="$HOME/.dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
+CONFIG_DIR="$HOME/.config"
+VERBOSE=0
+FORCE=0
+
+# Configuration file mapping (source:destination)
+# These are relative paths from the dotfiles repo to the home directory
+declare -A HOME_CONFIG_FILES=(
+  ["zshrc":".zshrc"]
+  ["bashrc":".bashrc"]
+  ["p10k.zsh":".p10k.zsh"]
+)
+
+# Configuration directories mapping (source:destination)
+# These are relative paths from the dotfiles repo to the ~/.config directory
+declare -A CONFIG_DIRS=(
+  ["hypr":"hypr"]
+  ["Ax-Shell":"Ax-Shell"]
+  ["kitty":"kitty"]
+  ["cava":"cava"]
+  ["warp-terminal":"warp-terminal"]
+  ["matugen":"matugen"]
+)
+
+#===============================================================================
+# Helper Functions
+#===============================================================================
+
+# Print usage information
+usage() {
+  echo -e "${BLUE}Usage:${NC} $0 [options] command"
+  echo
+  echo -e "${BLUE}Commands:${NC}"
+  echo "  init       Initialize dotfiles repository with existing configs"
+  echo "  install    Install/symlink dotfiles to the system"
+  echo "  update     Update repository with latest local changes"
+  echo "  list       List managed dotfiles"
+  echo "  help       Show this help message"
+  echo
+  echo -e "${BLUE}Options:${NC}"
+  echo "  -v, --verbose   Enable verbose output"
+  echo "  -f, --force     Force overwrite without confirmation"
+  echo "  -h, --help      Show this help message"
+  echo
+  echo -e "${BLUE}Examples:${NC}"
+  echo "  $0 init             # Initialize repository with existing configs"
+  echo "  $0 install          # Install dotfiles to system"
+  echo "  $0 update           # Update repository with local changes"
+  echo "  $0 -f install       # Force install without confirmation"
+  echo
+}
+
+# Print log message
+log() {
+  local level="$1"
+  local message="$2"
+  local color=""
+  
+  case "$level" in
+    "info") color="${GREEN}" ;;
+    "warn") color="${YELLOW}" ;;
+    "error") color="${RED}" ;;
+    "debug") color="${CYAN}" ;;
+    *) color="${NC}" ;;
+  esac
+  
+  # Only show debug messages when verbose is enabled
+  if [[ "$level" == "debug" && "$VERBOSE" -eq 0 ]]; then
+    return
+  fi
+  
+  echo -e "${color}[${level^^}]${NC} $message"
+}
+
+# Check if running on Arch Linux
+check_arch_linux() {
+  if [ -f /etc/arch-release ]; then
+    log "info" "Running on Arch Linux"
+  else
+    log "warn" "This script is designed for Arch Linux but you're running on $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d= -f2 | tr -d '"')"
+    read -p "Continue anyway? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      log "error" "Aborted"
+      exit 1
+    fi
+  fi
+}
+
+# Check required dependencies
+check_dependencies() {
+  local deps=("git" "ln" "mkdir" "cp")
+  local missing=()
+  
+  for dep in "${deps[@]}"; do
+    if ! command -v "$dep" &> /dev/null; then
+      missing+=("$dep")
+    fi
+  done
+  
+  if [ ${#missing[@]} -gt 0 ]; then
+    log "error" "Missing dependencies: ${missing[*]}"
+    log "info" "Please install the missing dependencies using pacman:"
+    log "info" "sudo pacman -S ${missing[*]}"
+    exit 1
+  fi
+  
+  log "info" "All required dependencies are installed"
+}
+
+# Backup a file or directory
+backup() {
+  local path="$1"
+  local backup_path="${BACKUP_DIR}${path}"
+  
+  # If the file/directory doesn't exist, no need to back up
+  if [ ! -e "$path" ]; then
+    log "debug" "Nothing to backup at $path"
+    return 0
+  fi
+  
+  # Create the backup directory structure
+  mkdir -p "$(dirname "$backup_path")"
+  
+  # Copy the file/directory
+  cp -r "$path" "$backup_path"
+  log "info" "Backed up $path to $backup_path"
+}
+
+# Create a symbolic link
+create_symlink() {
+  local source="$1"
+  local destination="$2"
+  
+  # Check if source exists
+  if [ ! -e "$source" ]; then
+    log "error" "Source does not exist: $source"
+    return 1
+  fi
+  
+  # Check if destination already exists
+  if [ -e "$destination" ]; then
+    # If it's already a symlink to the same source, no need to do anything
+    if [ -L "$destination" ] && [ "$(readlink -f "$destination")" == "$(readlink -f "$source")" ]; then
+      log "info" "Symlink already exists and points to the correct location: $destination"
+      return 0
+    fi
+    
+    # If force is not enabled, ask for confirmation
+    if [ "$FORCE" -eq 0 ]; then
+      log "warn" "$destination already exists"
+      read -p "Overwrite? [y/N] " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log "info" "Skipping $destination"
+        return 0
+      fi
+    fi
+    
+    # Backup the existing file/directory
+    backup "$destination"
+    
+    # Remove the existing file/directory
+    rm -rf "$destination"
+  fi
+  
+  # Create the parent directory if it doesn't exist
+  mkdir -p "$(dirname "$destination")"
+  
+  # Create the symlink
+  ln -s "$source" "$destination"
+  log "info" "Created symlink: $destination -> $source"
+}
+
+# Copy file to dotfiles repository
+copy_to_repo() {
+  local source="$1"
+  local repo_destination="$2"
+  
+  # Check if source exists
+  if [ ! -e "$source" ]; then
+    log "warn" "Source does not exist: $source"
+    return 1
+  fi
+  
+  # Create the parent directory in the repo if it doesn't exist
+  mkdir -p "$(dirname "$repo_destination")"
+  
+  # Copy the file/directory to the repo
+  cp -r "$source" "$repo_destination"
+  log "info" "Copied $source to $repo_destination"
+}
+
+#===============================================================================
+# Main Functions
+#===============================================================================
+
+# Initialize dotfiles repository with existing configs
+init_dotfiles() {
+  log "info" "Initializing dotfiles repository..."
+  
+  # Create repository structure
+  mkdir -p "$DOTFILES_DIR/home"
+  mkdir -p "$DOTFILES_DIR/config"
+  
+  # Copy home config files
+  for src in "${!HOME_CONFIG_FILES[@]}"; do
+    local dest="${HOME_CONFIG_FILES[$src]}"
+    local system_path="$HOME/$dest"
+    local repo_path="$DOTFILES_DIR/home/$src"
+    
+    if [ -e "$system_path" ]; then
+      copy_to_repo "$system_path" "$repo_path"
+    else
+      log "warn" "File not found: $system_path"
+    fi
+  done
+  
+  # Copy config directories
+  for src in "${!CONFIG_DIRS[@]}"; do
+    local dest="${CONFIG_DIRS[$src]}"
+    local system_path="$CONFIG_DIR/$dest"
+    local repo_path="$DOTFILES_DIR/config/$src"
+    
+    if [ -e "$system_path" ]; then
+      copy_to_repo "$system_path" "$repo_path"
+    else
+      log "warn" "Directory not found: $system_path"
+    fi
+  done
+  
+  log "info" "Repository initialized at $DOTFILES_DIR"
+  log "info" "You might want to commit the changes:"
+  log "info" "git -C \"$DOTFILES_DIR\" add ."
+  log "info" "git -C \"$DOTFILES_DIR\" commit -m \"Initial commit\""
+}
+
+# Install/symlink dotfiles to the system
+install_dotfiles() {
+  log "info" "Installing dotfiles..."
+  
+  # Create backup directory
+  mkdir -p "$BACKUP_DIR"
+  
+  # Symlink home config files
+  for src in "${!HOME_CONFIG_FILES[@]}"; do
+    local dest="${HOME_CONFIG_FILES[$src]}"
+    local repo_path="$DOTFILES_DIR/home/$src"
+    local system_path="$HOME/$dest"
+    
+    if [ -e "$repo_path" ]; then
+      create_symlink "$repo_path" "$system_path"
+    else
+      log "warn" "File not found in repository: $repo_path"
+    fi
+  done
+  
+  # Symlink config directories
+  for src in "${!CONFIG_DIRS[@]}"; do
+    local dest="${CONFIG_DIRS[$src]}"
+    local repo_path="$DOTFILES_DIR/config/$src"
+    local system_path="$CONFIG_DIR/$dest"
+    
+    if [ -e "$repo_path" ]; then
+      create_symlink "$repo_path" "$system_path"
+    else
+      log "warn" "Directory not found in repository: $repo_path"
+    fi
+  done
+  
+  log "info" "Dotfiles installation complete"
+}
+
+# Update repository with latest local changes
+update_repo() {
+  log "info" "Updating repository with latest local changes..."
+  
+  # Update home config files
+  for src in "${!HOME_CONFIG_FILES[@]}"; do
+    local dest="${HOME_CONFIG_FILES[$src]}"
+    local system_path="$HOME/$dest"
+    local repo_path="$DOTFILES_DIR/home/$src"
+    
+    # Only update if it's not a symlink (meaning it wasn't installed by this script)
+    # or if the symlink doesn't point to our repo
+    if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
+      copy_to_repo "$system_path" "$repo_path"
+    fi
+  done
+  
+  # Update config directories
+  for src in "${!CONFIG_DIRS[@]}"; do
+    local dest="${CONFIG_DIRS[$src]}"
+    local system_path="$CONFIG_DIR/$dest"
+    local repo_path="$DOTFILES_DIR/config/$src"
+    
+    # Only update if it's not a symlink (meaning it wasn't installed by this script)
+    # or if the symlink doesn't point to our repo
+    if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
+      # Remove old copy in repo if it exists
+      if [ -e "$repo_path" ]; then
+        rm -rf "$repo_path"
+      fi
+      copy_to_repo "$system_path" "$repo_path"
+    fi
+  done
+  
+  log "info" "Repository update complete"
+  log "info" "You might want to commit the changes:"
+  log "info" "git -C \"$DOTFILES_DIR\" add ."
+  log "info" "git -C \"$DOTFILES_DIR\" commit -m \"Update dotfiles\""
+}
+
+# List managed dotfiles
+list_dotfiles() {
+  log "info" "Managed home config files:"
+  for src in "${!HOME_CONFIG_FILES[@]}"; do
+    local dest="${HOME_CONFIG_FILES[$src]}"
+    local repo_path="$DOTFILES_DIR/home/$src"
+    local system_path="$HOME/$dest"
+    
+    if [ -e "$repo_path" ]; then
+      echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
+    else
+      echo -e "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
+    fi
+  done
+  
+  echo
+  log "info" "Managed config directories:"
+  for src in "${!CONFIG_DIRS[@]}"; do
+    local dest="${CONFIG_DIRS[$src]}"
+    local repo_path="$DOTFILES_DIR/config/$src"
+    local system_path="$CONFIG_DIR/$dest"
+    
+    if [ -e "$repo_path" ]; then
+      echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
+    else
+      echo -e "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
+    fi
+  done
+}
+
+#===============================================================================
+# Main Script
+#===============================================================================
+
+# Parse command-line options
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v|--verbose)
+      VERBOSE=1
+      shift
+      ;;
+    -f|--force)
+      FORCE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    init|install|update|list|help)
+      COMMAND="$1"
+      shift
+      ;;
+    *)
+      log "error" "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+# Check if a command was provided
+if [ -z "${COMMAND:-}" ]; then
+  log "error" "No command specified"
+  usage
+  exit 1
+fi
+
+# Execute the command
+case "$COMMAND" in
+  init)
+    check_arch_linux
+    check_dependencies
+    init_dotfiles
+    ;;
+  install)
+    check_arch_linux
+    check_dependencies
+    install_dotfiles
+    ;;
+  update)
+    check_arch_linux
+    check_dependencies
+    update_repo
+    ;;
+  list)
+    list_dotfiles
+    ;;
+  help)
+    usage
+    ;;
+  *)
+    log "error" "Unknown command: $COMMAND"
+    usage
+    exit 1
+    ;;
+esac
+
+exit 0
+
