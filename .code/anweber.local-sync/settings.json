@@ -1,0 +1,164 @@
+{
+  "editor.fontLigatures": true,
+  "editor.rulers": [
+    80,
+    120
+  ],
+  "editor.renderLineHighlight": "gutter",
+  "editor.fontFamily": "JetBrains Mono, Fira Code, Source Code Pro, Hack, Consolas, Monaco",
+  //"editor.fontFamily": "JetBrains Mono",
+  "editor.fontSize": 14,
+  "editor.semanticHighlighting.enabled": true,
+  "editor.stickyScroll.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.unicodeHighlight.nonBasicASCII": false,
+  "editor.inlineSuggest.suppressSuggestions": true,
+  "editor.largeFileOptimizations": false,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "editor.formatOnSave": true,
+  "[scss]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "editor.suggestSelection": "recentlyUsed",
+    "editor.suggest.showKeywords": false
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[xml]": {
+    "editor.defaultFormatter": "PrateekMahendrakar.prettyxml"
+  },
+  "[dockercompose]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
+  "explorer.compactFolders": false,
+  "symbols.hidesExplorerArrows": false,
+  "explorer.confirmDelete": false,
+  "workbench.editor.labelFormat": "short",
+  "git.autofetch": true,
+  "git.enableSmartCommit": true,
+  "git.mergeEditor": true,
+  "git.confirmSync": false,
+  "remote.autoForwardPortsSource": "hybrid",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "githubPullRequests.pullBranch": "never",
+  "cSpell.language": "en,pt-BR,pt",
+  "cSpell.userWords": [
+    "CFOP",
+    "CNAE",
+    "Dotfiles",
+    "toastr",
+    "Workmotor",
+    "Zorin"
+  ],
+  //"vscodeGoogleTranslate.preferredLanguage": "English",
+  "security.workspace.trust.untrustedFiles": "open",
+  "vscord.app.name": "Visual Studio Code",
+  "vscord.app.privacyMode.enable": true,
+  // "cody.chat.preInstruction": "Answer all my questions in Brazilian Portuguese. If possible, refactor or correct the code, leaving it decoupled and clean code respecting the principles of SOLID",
+  // "sqltools.connections": [
+  //     {
+  //         "mysqlOptions": {
+  //             "authProtocol": "default",
+  //             "enableSsl": "Disabled"
+  //         },
+  //         "previewLimit": 50,
+  //         "server": "162.214.89.0",
+  //         "port": 3306,
+  //         "driver": "MySQL",
+  //         "name": "[PROD] DEVOSD",
+  //         "database": "prodosdig",
+  //         "username": "prodosdig",
+  //         "password": "ByN!xpXVY?wk"
+  //     }
+  // ],
+  // "cody.autocomplete.enabled": true,
+  // "cody.autocomplete.formatOnAccept": true,
+  // "cody.autocomplete.languages": {
+  //     "plaintext": true,
+  //     "*": true
+  // },
+  "errorLens.excludeMessages": [
+    "Unknown word"
+  ],
+  "workbench.editor.enablePreview": false,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "quokka.automaticRestart": true,
+  // "terminal.integrated.env.windows": {},
+  // "terminal.integrated.profiles.windows": {
+  //     "PowerShell": {
+  //         "source": "PowerShell",
+  //         "icon": "terminal-powershell"
+  //     },
+  //     "Command Prompt": {
+  //         "path": [
+  //             "${env:windir}\\Sysnative\\cmd.exe",
+  //             "${env:windir}\\System32\\cmd.exe"
+  //         ],
+  //         "args": [],
+  //         "icon": "terminal-cmd"
+  //     },
+  //     "Git Bash": {
+  //         "source": "Git Bash"
+  //     },
+  //     "Windows PowerShell": {
+  //         "path": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+  //     }
+  // },
+  "terminal.integrated.defaultProfile.windows": "Windows PowerShell",
+  "terminal.integrated.fontLigatures.enabled": true,
+  "terminal.integrated.fontFamily": "\"MesloLGS NF\"",
+  //"console-ninja.featureSet": "Community",
+  "terminal.integrated.env.windows": {},
+  //"workbench.colorTheme": "Dracula Theme Soft",
+  "terminal.integrated.env.linux": {},
+  "workbench.colorTheme": "Dracula Theme",
+  "console-ninja.featureSet": "Community",
+  "sync.autoUpload": true,
+  "sync.gist": ""
+}
