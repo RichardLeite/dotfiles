@@ -116,22 +116,30 @@ check_arch_linux() {
   fi
 }
 
-# Check required dependencies
+# Check required dependencies and install if missing
 check_dependencies() {
   local deps=("git" "ln" "mkdir" "cp")
   local missing=()
   
+  # Check which dependencies are missing
   for dep in "${deps[@]}"; do
     if ! command -v "$dep" &> /dev/null; then
       missing+=("$dep")
     fi
   done
   
+  # If there are missing dependencies, install them
   if [ ${#missing[@]} -gt 0 ]; then
-    log "error" "Missing dependencies: ${missing[*]}"
-    log "info" "Please install the missing dependencies using pacman:"
-    log "info" "sudo pacman -S ${missing[*]}"
-    exit 1
+    log "warn" "Missing dependencies: ${missing[*]}"
+    log "info" "Installing missing dependencies..."
+    
+    # Run sudo pacman -S with the missing dependencies
+    if sudo pacman -S --noconfirm "${missing[@]}"; then
+      log "info" "Dependencies installed successfully"
+    else
+      log "error" "Failed to install dependencies"
+      exit 1
+    fi
   fi
   
   log "info" "All required dependencies are installed"
@@ -156,8 +164,8 @@ backup() {
   log "info" "Backed up $path to $backup_path"
 }
 
-# Create a symbolic link
-create_symlink() {
+# Copy a file or directory
+copy_file() {
   local source="$1"
   local destination="$2"
   
@@ -169,12 +177,6 @@ create_symlink() {
   
   # Check if destination already exists
   if [ -e "$destination" ]; then
-    # If it's already a symlink to the same source, no need to do anything
-    if [ -L "$destination" ] && [ "$(readlink -f "$destination")" == "$(readlink -f "$source")" ]; then
-      log "info" "Symlink already exists and points to the correct location: $destination"
-      return 0
-    fi
-    
     # If force is not enabled, ask for confirmation
     if [ "$FORCE" -eq 0 ]; then
       log "warn" "$destination already exists"
@@ -196,9 +198,13 @@ create_symlink() {
   # Create the parent directory if it doesn't exist
   mkdir -p "$(dirname "$destination")"
   
-  # Create the symlink
-  ln -s "$source" "$destination"
-  log "info" "Created symlink: $destination -> $source"
+  # Copy the file/directory
+  if [ -d "$source" ]; then
+    cp -r "$source" "$destination"
+  else
+    cp "$source" "$destination"
+  fi
+  log "info" "Copied: $source -> $destination"
 }
 
 # Copy file to dotfiles repository
@@ -218,6 +224,77 @@ copy_to_repo() {
   # Copy the file/directory to the repo
   cp -r "$source" "$repo_destination"
   log "info" "Copied $source to $repo_destination"
+}
+
+# Install base packages and dependencies
+install_base_packages() {
+  log "info" "Installing base packages..."
+  
+  # Essential packages
+  local base_packages=(
+    "base-devel"
+    "hyprland"
+    "kitty"
+    "zsh"
+    "oh-my-zsh"
+    "powerlevel10k"
+    "ttf-jetbrains-mono"
+    "ttf-fira-code"
+    "ttf-source-code-pro"
+    "ttf-hack"
+    "ttf-consolas"
+    "ttf-monaco"
+    "ttf-roboto"
+    "ttf-meslo-nerd-font"
+    "gst-plugins-base"
+    "gst-plugins-good"
+    "gst-plugins-bad"
+    "gst-plugins-ugly"
+    "gst-libav"
+  )
+  
+  # Install packages
+  if sudo pacman -S --noconfirm "${base_packages[@]}"; then
+    log "info" "Base packages installed successfully"
+  else
+    log "error" "Failed to install base packages"
+    exit 1
+  fi
+  
+  # Install yay if not already installed
+  if ! command -v yay &> /dev/null; then
+    log "info" "Installing yay..."
+
+    sudo pacman -S --noconfirm base-devel
+    
+    # Clone yay repository
+    git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin
+    cd /tmp/yay-bin
+    
+    # Build and install yay
+    makepkg -si --noconfirm
+    
+    # Clean up
+    cd - > /dev/null
+    rm -rf /tmp/yay-bin
+  fi
+  
+  # Install oh-my-zsh and powerlevel10k if not already installed
+  if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    log "info" "Installing oh-my-zsh..."
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+  fi
+  
+  if [ ! -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
+    log "info" "Installing powerlevel10k..."
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
+  fi
+  
+  # Set zsh as default shell
+  if [ "$SHELL" != "/usr/bin/zsh" ]; then
+    log "info" "Setting zsh as default shell..."
+    chsh -s /usr/bin/zsh
+  fi
 }
 
 #===============================================================================
@@ -264,34 +341,34 @@ init_dotfiles() {
   log "info" "git -C \"$DOTFILES_DIR\" commit -m \"Initial commit\""
 }
 
-# Install/symlink dotfiles to the system
+# Copy dotfiles to the system
 install_dotfiles() {
-  log "info" "Installing dotfiles..."
+  log "info" "Copying dotfiles..."
   
   # Create backup directory
   mkdir -p "$BACKUP_DIR"
   
-  # Symlink home config files
+  # Copy home config files
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local repo_path="$DOTFILES_DIR/home/$src"
     local system_path="$HOME/$dest"
     
     if [ -e "$repo_path" ]; then
-      create_symlink "$repo_path" "$system_path"
+      copy_file "$repo_path" "$system_path"
     else
       log "warn" "File not found in repository: $repo_path"
     fi
   done
   
-  # Symlink config directories
+  # Copy config directories
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local repo_path="$DOTFILES_DIR/config/$src"
     local system_path="$CONFIG_DIR/$dest"
     
     if [ -e "$repo_path" ]; then
-      create_symlink "$repo_path" "$system_path"
+      copy_file "$repo_path" "$system_path"
     else
       log "warn" "Directory not found in repository: $repo_path"
     fi
@@ -418,6 +495,7 @@ case "$COMMAND" in
   install)
     check_arch_linux
     check_dependencies
+    install_base_packages
     install_dotfiles
     ;;
   update)
