@@ -7,7 +7,7 @@ Repositório de configurações pessoais para Arch Linux com Hyprland.
 Este repositório contém as configurações pessoais do sistema, incluindo arquivos de configuração para:
 
 - Shell (zsh, bash)
-- Terminal (kitty)
+- Terminal (kitty, warp-terminal)
 - WM (Hyprland)
 - Outros programas (Ax-Shell, cava, etc.)
 

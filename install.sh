@@ -35,20 +35,21 @@ FORCE=0
 # Configuration file mapping (source:destination)
 # These are relative paths from the dotfiles repo to the home directory
 declare -A HOME_CONFIG_FILES=(
-  ["zshrc":".zshrc"]
-  ["bashrc":".bashrc"]
-  ["p10k.zsh":".p10k.zsh"]
+  ["zshrc"]=".zshrc"
+  ["bashrc"]=".bashrc"
+  ["p10k.zsh"]=".p10k.zsh"
 )
 
 # Configuration directories mapping (source:destination)
 # These are relative paths from the dotfiles repo to the ~/.config directory
 declare -A CONFIG_DIRS=(
-  ["hypr":"hypr"]
-  ["Ax-Shell":"Ax-Shell"]
-  ["kitty":"kitty"]
-  ["cava":"cava"]
-  ["warp-terminal":"warp-terminal"]
-  ["matugen":"matugen"]
+  ["hypr"]="hypr"
+  ["Ax-Shell"]="Ax-Shell"
+  ["kitty"]="kitty"
+  ["cava"]="cava"
+  ["warp-terminal"]="warp-terminal"
+  ["matugen"]="matugen"
+  ["sddm"]="sddm"
 )
 
 #===============================================================================
@@ -200,7 +201,7 @@ copy_file() {
   
   # Copy the file/directory
   if [ -d "$source" ]; then
-    cp -r "$source" "$destination"
+    cp -rT "$source" "$destination"
   else
     cp "$source" "$destination"
   fi
@@ -221,9 +222,19 @@ copy_to_repo() {
   # Create the parent directory in the repo if it doesn't exist
   mkdir -p "$(dirname "$repo_destination")"
   
-  # Copy the file/directory to the repo
-  cp -r "$source" "$repo_destination"
-  log "info" "Copied $source to $repo_destination"
+  # Copy files and directories
+  if [ -f "$source" ]; then
+    cp -p "$source" "$repo_destination"
+    log "info" "Copied file $source to $repo_destination"
+  elif [ -d "$source" ]; then
+    # For directories, create it in the repo
+    mkdir -p "$repo_destination"
+    log "info" "Created directory $repo_destination"
+    
+    # Copy only the contents of the directory
+    cp -rp "$source"/* "$repo_destination/" 2>/dev/null || true
+    cp -rp "$source"/.* "$repo_destination/" 2>/dev/null || true
+  fi
 }
 
 # Install base packages and dependencies
@@ -234,6 +245,9 @@ install_base_packages() {
   local base_packages=(
     "base-devel"
     "hyprland"
+    "hyprlock"
+    "hypridle"
+    "sddm"
     "kitty"
     "zsh"
     "oh-my-zsh"
@@ -374,6 +388,47 @@ install_dotfiles() {
     fi
   done
   
+  # Set up SDDM for Hyprland
+  if [ -d "/etc/sddm.conf.d" ]; then
+    log "info" "Setting up SDDM for Hyprland..."
+    
+    # Create SDDM config directory in repo if it doesn't exist
+    mkdir -p "$DOTFILES_DIR/config/sddm/sddm.conf.d"
+    
+    # Create or update wayland.conf for SDDM
+    local sddm_wayland_conf="$DOTFILES_DIR/config/sddm/sddm.conf.d/wayland.conf"
+    echo "[General]" > "$sddm_wayland_conf"
+    echo "DisplayServer=wayland" >> "$sddm_wayland_conf"
+    echo "" >> "$sddm_wayland_conf"
+    echo "[Wayland]" >> "$sddm_wayland_conf"
+    echo "SessionDir=/usr/share/wayland-sessions" >> "$sddm_wayland_conf"
+    echo "" >> "$sddm_wayland_conf"
+    echo "[Autologin]" >> "$sddm_wayland_conf"
+    echo "User=$(whoami)" >> "$sddm_wayland_conf"
+    echo "Session=hyprland.desktop" >> "$sddm_wayland_conf"
+    echo "Relogin=false" >> "$sddm_wayland_conf"
+    
+    # Check if /etc/sddm.conf.d/wayland.conf already exists
+    local system_sddm_wayland_conf="/etc/sddm.conf.d/wayland.conf"
+    if [ -e "$system_sddm_wayland_conf" ]; then
+      # Backup the existing file
+      backup "$system_sddm_wayland_conf"
+    fi
+    
+    # Create the destination directory if it doesn't exist
+    if [ ! -d "/etc/sddm.conf.d" ]; then
+      sudo mkdir -p "/etc/sddm.conf.d"
+    fi
+    
+    # Copy the file to the system with sudo
+    sudo cp "$sddm_wayland_conf" "$system_sddm_wayland_conf"
+    log "info" "SDDM configured for Hyprland"
+    
+    # Enable SDDM service
+    log "info" "Enabling SDDM service..."
+    sudo systemctl enable sddm.service
+  fi
+  
   log "info" "Dotfiles installation complete"
 }
 
@@ -385,7 +440,7 @@ update_repo() {
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local system_path="$HOME/$dest"
-    local repo_path="$DOTFILES_DIR/home/$src"
+    local repo_path="$DOTFILES_DIR/home/$dest"
     
     # Only update if it's not a symlink (meaning it wasn't installed by this script)
     # or if the symlink doesn't point to our repo
