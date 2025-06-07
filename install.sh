@@ -241,8 +241,8 @@ copy_to_repo() {
 install_base_packages() {
   log "info" "Installing base packages..."
   
-  # Essential packages
-  local base_packages=(
+  # Essential packages from official repositories
+  local official_packages=(
     "base-devel"
     "hyprland"
     "hyprlock"
@@ -250,16 +250,10 @@ install_base_packages() {
     "sddm"
     "kitty"
     "zsh"
-    "oh-my-zsh"
-    "powerlevel10k"
     "ttf-jetbrains-mono"
     "ttf-fira-code"
-    "ttf-source-code-pro"
     "ttf-hack"
-    "ttf-consolas"
-    "ttf-monaco"
     "ttf-roboto"
-    "ttf-meslo-nerd-font"
     "gst-plugins-base"
     "gst-plugins-good"
     "gst-plugins-bad"
@@ -267,13 +261,33 @@ install_base_packages() {
     "gst-libav"
   )
   
-  # Install packages
-  if sudo pacman -S --noconfirm "${base_packages[@]}"; then
+  # Install official packages
+  if sudo pacman -S --noconfirm "${official_packages[@]}"; then
+    
+    # Install powerlevel10k font assets if not already installed
+    if [ ! -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media" ]; then
+      log "info" "Installing powerlevel10k font assets..."
+      git clone --depth=1 https://github.com/romkatv/powerlevel10k-media.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media"
+    fi
+    
+    log "success" "All packages installed successfully"
+  else
+    log "error" "Failed to install base packages"
+    exit 1
+  fi
     log "info" "Base packages installed successfully"
   else
     log "error" "Failed to install base packages"
     exit 1
   fi
+
+    # AUR packages
+  local aur_packages=(
+    "ttf-source-code-pro"
+    "ttf-consolas"
+    "ttf-monaco"
+    "ttf-meslo-nerd-font"
+  )
   
   # Install yay if not already installed
   if ! command -v yay &> /dev/null; then
@@ -292,6 +306,10 @@ install_base_packages() {
     cd - > /dev/null
     rm -rf /tmp/yay-bin
   fi
+
+  # Install AUR packages
+  log "info" "Installing AUR packages..."
+  yay -S --noconfirm "${aur_packages[@]}"
   
   # Install oh-my-zsh and powerlevel10k if not already installed
   if [ ! -d "$HOME/.oh-my-zsh" ]; then
@@ -308,6 +326,12 @@ install_base_packages() {
   if [ "$SHELL" != "/usr/bin/zsh" ]; then
     log "info" "Setting zsh as default shell..."
     chsh -s /usr/bin/zsh
+  fi
+
+  # Install Ax-Shell if not already installed
+  if [ ! -d "$HOME/.config/Ax-Shell" ]; then
+    log "info" "Installing Ax-Shell..."
+    curl -fsSL https://raw.githubusercontent.com/Axenide/Ax-Shell/main/install.sh | bash
   fi
 }
 
