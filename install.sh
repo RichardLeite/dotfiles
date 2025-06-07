@@ -270,12 +270,7 @@ install_base_packages() {
       git clone --depth=1 https://github.com/romkatv/powerlevel10k-media.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media"
     fi
     
-    log "success" "All packages installed successfully"
-  else
-    log "error" "Failed to install base packages"
-    exit 1
-  fi
-    log "info" "Base packages installed successfully"
+    log "success" "Base packages installed successfully"
   else
     log "error" "Failed to install base packages"
     exit 1
