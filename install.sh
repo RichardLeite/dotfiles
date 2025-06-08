@@ -17,20 +17,13 @@
 set -e
 
 # Color definitions
-declare -A COLORS=(
-  [red]="\033[0;31m"
-  [green]="\033[0;32m"
-  [yellow]="\033[0;33m"
-  [blue]="\033[0;34m"
-  [magenta]="\033[0;35m"
-  [cyan]="\033[0;36m"
-  [reset]="\033[0m"
-)
-
-# Get color by name
-get_color() {
-  echo "${COLORS[$1]}"
-}
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 # Script variables
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
