@@ -249,6 +249,7 @@ install_base_packages() {
     "hypridle"
     "sddm"
     "kitty"
+    "nautilus"
     "zsh"
     "ttf-jetbrains-mono"
     "ttf-fira-code"
@@ -282,6 +283,8 @@ install_base_packages() {
     "ttf-consolas"
     "ttf-monaco"
     "ttf-meslo-nerd-font"
+    "warp-terminal-bin"
+    "microsoft-edge-stable-bin"
   )
 
   # Install yay if not already installed
