@@ -623,12 +623,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Check if a command was provided
-if [ -z "${COMMAND:-}" ]; then
-  log "error" "No command specified"
-  usage
-  exit 1
-fi
+# Set default command to install if none specified
+COMMAND=${COMMAND:-"install"}
 
 # Execute the command
 case "$COMMAND" in
