@@ -17,13 +17,20 @@
 set -e
 
 # Color definitions
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+declare -A COLORS=(
+  [red]="\033[0;31m"
+  [green]="\033[0;32m"
+  [yellow]="\033[0;33m"
+  [blue]="\033[0;34m"
+  [magenta]="\033[0;35m"
+  [cyan]="\033[0;36m"
+  [reset]="\033[0m"
+)
+
+# Get color by name
+get_color() {
+  echo "${COLORS[$1]}"
+}
 
 # Script variables
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,7 +51,6 @@ declare -A HOME_CONFIG_FILES=(
 # These are relative paths from the dotfiles repo to the ~/.config directory
 declare -A CONFIG_DIRS=(
   ["hypr"]="hypr"
-  ["Ax-Shell"]="Ax-Shell"
   ["kitty"]="kitty"
   ["cava"]="cava"
   ["warp-terminal"]="warp-terminal"
@@ -119,17 +125,19 @@ check_arch_linux() {
 
 # Check required dependencies and install if missing
 check_dependencies() {
-  local deps=("git" "ln" "mkdir" "cp")
+  local deps=("git" "ln" "rsync")
   local missing=()
+  local installed=()
 
   # Check which dependencies are missing
   for dep in "${deps[@]}"; do
     if ! command -v "$dep" &>/dev/null; then
       missing+=("$dep")
+    else
+      installed+=("$dep")
     fi
   done
 
-  # If there are missing dependencies, install them
   if [ ${#missing[@]} -gt 0 ]; then
     log "warn" "Missing dependencies: ${missing[*]}"
     log "info" "Installing missing dependencies..."
@@ -143,26 +151,38 @@ check_dependencies() {
     fi
   fi
 
+  if [ ${#installed[@]} -gt 0 ]; then
+    log "info" "Already installed: ${installed[*]}"
+  fi
+
   log "info" "All required dependencies are installed"
 }
 
-# Backup a file or directory
+# Backup a file or directory using rsync
 backup() {
   local path="$1"
   local backup_path="${BACKUP_DIR}${path}"
 
-  # If the file/directory doesn't exist, no need to back up
   if [ ! -e "$path" ]; then
     log "debug" "Nothing to backup at $path"
     return 0
   fi
 
-  # Create the backup directory structure
+  # Create backup directory structure
   mkdir -p "$(dirname "$backup_path")"
 
-  # Copy the file/directory
-  cp -r "$path" "$backup_path"
+  # Use rsync for efficient backup
+  rsync -av --delete "$path" "$backup_path"
   log "info" "Backed up $path to $backup_path"
+}
+
+# Create directory if it doesn't exist
+create_dir() {
+  local dir="$1"
+  if [ ! -d "$dir" ]; then
+    mkdir -p "$dir"
+    log "debug" "Created directory: $dir"
+  fi
 }
 
 # Copy a file or directory
@@ -196,45 +216,31 @@ copy_file() {
     rm -rf "$destination"
   fi
 
-  # Create the parent directory if it doesn't exist
-  mkdir -p "$(dirname "$destination")"
+  # Create parent directory
+  create_dir "$(dirname "$destination")"
 
-  # Copy the file/directory
-  if [ -d "$source" ]; then
-    cp -rT "$source" "$destination"
-  else
-    cp "$source" "$destination"
-  fi
-  log "info" "Copied: $source -> $destination"
+  # Copy using rsync for better efficiency
+  rsync -av "$source" "$destination"
+  log "info" "Copied $source to $destination"
 }
 
 # Copy file to dotfiles repository
 copy_to_repo() {
   local source="$1"
-  local repo_destination="$2"
+  local dest="$2"
+  local repo_path="$DOTFILES_DIR/config/$dest"
+  local system_path="$CONFIG_DIR/$source"
 
-  # Check if source exists
-  if [ ! -e "$source" ]; then
-    log "warn" "Source does not exist: $source"
+  if [ ! -e "$system_path" ]; then
+    log "error" "Source does not exist: $system_path"
     return 1
   fi
 
-  # Create the parent directory in the repo if it doesn't exist
-  mkdir -p "$(dirname "$repo_destination")"
+  create_dir "$(dirname "$repo_path")"
 
-  # Copy files and directories
-  if [ -f "$source" ]; then
-    cp -p "$source" "$repo_destination"
-    log "info" "Copied file $source to $repo_destination"
-  elif [ -d "$source" ]; then
-    # For directories, create it in the repo
-    mkdir -p "$repo_destination"
-    log "info" "Created directory $repo_destination"
-
-    # Copy only the contents of the directory
-    cp -rp "$source"/* "$repo_destination/" 2>/dev/null || true
-    cp -rp "$source"/.* "$repo_destination/" 2>/dev/null || true
-  fi
+  # Copy using rsync for better efficiency
+  rsync -av "$system_path" "$repo_path"
+  log "info" "Copied $system_path to $repo_path"
 }
 
 # Install base packages and dependencies
@@ -464,46 +470,47 @@ install_dotfiles() {
     fi
   done
 
-  # Set up SDDM for Hyprland
-  if [ -d "/etc/sddm.conf.d" ]; then
-    log "info" "Setting up SDDM for Hyprland..."
+  # Copy Ax-Shell config separately
+  local ax_shell_config_repo="$DOTFILES_DIR/config/Ax-Shell/config/config.json"
+  local ax_shell_config_system="$CONFIG_DIR/Ax-Shell/config/config.json"
 
-    # Create SDDM config directory in repo if it doesn't exist
-    mkdir -p "$DOTFILES_DIR/config/sddm/sddm.conf.d"
-
-    # Create or update wayland.conf for SDDM
-    local sddm_wayland_conf="$DOTFILES_DIR/config/sddm/sddm.conf.d/wayland.conf"
-    echo "[General]" >"$sddm_wayland_conf"
-    echo "DisplayServer=wayland" >>"$sddm_wayland_conf"
-    echo "" >>"$sddm_wayland_conf"
-    echo "[Wayland]" >>"$sddm_wayland_conf"
-    echo "SessionDir=/usr/share/wayland-sessions" >>"$sddm_wayland_conf"
-    echo "" >>"$sddm_wayland_conf"
-    echo "[Autologin]" >>"$sddm_wayland_conf"
-    echo "User=$(whoami)" >>"$sddm_wayland_conf"
-    echo "Session=hyprland.desktop" >>"$sddm_wayland_conf"
-    echo "Relogin=false" >>"$sddm_wayland_conf"
-
-    # Check if /etc/sddm.conf.d/wayland.conf already exists
-    local system_sddm_wayland_conf="/etc/sddm.conf.d/wayland.conf"
-    if [ -e "$system_sddm_wayland_conf" ]; then
-      # Backup the existing file
-      backup "$system_sddm_wayland_conf"
-    fi
-
-    # Create the destination directory if it doesn't exist
-    if [ ! -d "/etc/sddm.conf.d" ]; then
-      sudo mkdir -p "/etc/sddm.conf.d"
-    fi
-
-    # Copy the file to the system with sudo
-    sudo cp "$sddm_wayland_conf" "$system_sddm_wayland_conf"
-    log "info" "SDDM configured for Hyprland"
-
-    # Enable SDDM service
-    log "info" "Enabling SDDM service..."
-    sudo systemctl enable sddm.service
+  if [ -e "$ax_shell_config_repo" ]; then
+    copy_file "$ax_shell_config_repo" "$ax_shell_config_system"
+  else
+    log "warn" "Ax-Shell config not found in repository: $ax_shell_config_repo"
   fi
+
+  # Set up SDDM for Hyprland
+  log "info" "Setting up SDDM for Hyprland..."
+
+  # Create SDDM configuration directory if it doesn't exist
+  sudo mkdir -p /etc/sddm.conf.d
+
+  # Backup existing SDDM config if it exists
+  local system_sddm_conf="/etc/sddm.conf.d/wayland.conf"
+  if [ -e "$system_sddm_conf" ]; then
+    backup "$system_sddm_conf"
+  fi
+
+  # Create SDDM configuration
+  sudo tee "$system_sddm_conf" >/dev/null <<'EOF'
+[General]
+DisplayServer=wayland
+
+[Wayland]
+SessionDir=/usr/share/wayland-sessions
+
+[Autologin]
+User=$(whoami)
+Session=hyprland.desktop
+Relogin=false
+EOF
+
+  log "info" "SDDM configured for Hyprland"
+
+  # Enable SDDM service
+  log "info" "Enabling SDDM service..."
+  sudo systemctl enable sddm.service
 
   log "info" "Dotfiles installation complete"
 }
@@ -541,6 +548,20 @@ update_repo() {
       copy_to_repo "$system_path" "$repo_path"
     fi
   done
+
+  # Update Ax-Shell config separately
+  local ax_shell_config_system="$CONFIG_DIR/Ax-Shell/config/config.json"
+  local ax_shell_config_repo="$DOTFILES_DIR/config/Ax-Shell/config/config.json"
+
+  # Only update if it's not a symlink (meaning it wasn't installed by this script)
+  # or if the symlink doesn't point to our repo
+  if [ -e "$ax_shell_config_system" ] && { [ ! -L "$ax_shell_config_system" ] || [ "$(readlink -f "$ax_shell_config_system")" != "$(readlink -f "$ax_shell_config_repo")" ]; }; then
+    # Remove old copy in repo if it exists
+    if [ -e "$ax_shell_config_repo" ]; then
+      rm -rf "$ax_shell_config_repo"
+    fi
+    copy_to_repo "$ax_shell_config_system" "$ax_shell_config_repo"
+  fi
 
   log "info" "Repository update complete"
   log "info" "You might want to commit the changes:"
