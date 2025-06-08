@@ -85,20 +85,20 @@ log() {
   local level="$1"
   local message="$2"
   local color=""
-  
+
   case "$level" in
-    "info") color="${GREEN}" ;;
-    "warn") color="${YELLOW}" ;;
-    "error") color="${RED}" ;;
-    "debug") color="${CYAN}" ;;
-    *) color="${NC}" ;;
+  "info") color="${GREEN}" ;;
+  "warn") color="${YELLOW}" ;;
+  "error") color="${RED}" ;;
+  "debug") color="${CYAN}" ;;
+  *) color="${NC}" ;;
   esac
-  
+
   # Only show debug messages when verbose is enabled
   if [[ "$level" == "debug" && "$VERBOSE" -eq 0 ]]; then
     return
   fi
-  
+
   echo -e "${color}[${level^^}]${NC} $message"
 }
 
@@ -121,19 +121,19 @@ check_arch_linux() {
 check_dependencies() {
   local deps=("git" "ln" "mkdir" "cp")
   local missing=()
-  
+
   # Check which dependencies are missing
   for dep in "${deps[@]}"; do
-    if ! command -v "$dep" &> /dev/null; then
+    if ! command -v "$dep" &>/dev/null; then
       missing+=("$dep")
     fi
   done
-  
+
   # If there are missing dependencies, install them
   if [ ${#missing[@]} -gt 0 ]; then
     log "warn" "Missing dependencies: ${missing[*]}"
     log "info" "Installing missing dependencies..."
-    
+
     # Run sudo pacman -S with the missing dependencies
     if sudo pacman -S --noconfirm "${missing[@]}"; then
       log "info" "Dependencies installed successfully"
@@ -142,7 +142,7 @@ check_dependencies() {
       exit 1
     fi
   fi
-  
+
   log "info" "All required dependencies are installed"
 }
 
@@ -150,16 +150,16 @@ check_dependencies() {
 backup() {
   local path="$1"
   local backup_path="${BACKUP_DIR}${path}"
-  
+
   # If the file/directory doesn't exist, no need to back up
   if [ ! -e "$path" ]; then
     log "debug" "Nothing to backup at $path"
     return 0
   fi
-  
+
   # Create the backup directory structure
   mkdir -p "$(dirname "$backup_path")"
-  
+
   # Copy the file/directory
   cp -r "$path" "$backup_path"
   log "info" "Backed up $path to $backup_path"
@@ -169,13 +169,13 @@ backup() {
 copy_file() {
   local source="$1"
   local destination="$2"
-  
+
   # Check if source exists
   if [ ! -e "$source" ]; then
     log "error" "Source does not exist: $source"
     return 1
   fi
-  
+
   # Check if destination already exists
   if [ -e "$destination" ]; then
     # If force is not enabled, ask for confirmation
@@ -188,17 +188,17 @@ copy_file() {
         return 0
       fi
     fi
-    
+
     # Backup the existing file/directory
     backup "$destination"
-    
+
     # Remove the existing file/directory
     rm -rf "$destination"
   fi
-  
+
   # Create the parent directory if it doesn't exist
   mkdir -p "$(dirname "$destination")"
-  
+
   # Copy the file/directory
   if [ -d "$source" ]; then
     cp -rT "$source" "$destination"
@@ -212,16 +212,16 @@ copy_file() {
 copy_to_repo() {
   local source="$1"
   local repo_destination="$2"
-  
+
   # Check if source exists
   if [ ! -e "$source" ]; then
     log "warn" "Source does not exist: $source"
     return 1
   fi
-  
+
   # Create the parent directory in the repo if it doesn't exist
   mkdir -p "$(dirname "$repo_destination")"
-  
+
   # Copy files and directories
   if [ -f "$source" ]; then
     cp -p "$source" "$repo_destination"
@@ -230,7 +230,7 @@ copy_to_repo() {
     # For directories, create it in the repo
     mkdir -p "$repo_destination"
     log "info" "Created directory $repo_destination"
-    
+
     # Copy only the contents of the directory
     cp -rp "$source"/* "$repo_destination/" 2>/dev/null || true
     cp -rp "$source"/.* "$repo_destination/" 2>/dev/null || true
@@ -240,7 +240,7 @@ copy_to_repo() {
 # Install base packages and dependencies
 install_base_packages() {
   log "info" "Installing base packages..."
-  
+
   # Essential packages from official repositories
   local official_packages=(
     "base-devel"
@@ -260,63 +260,63 @@ install_base_packages() {
     "gst-plugins-ugly"
     "gst-libav"
   )
-  
+
   # Install official packages
   if sudo pacman -S --noconfirm "${official_packages[@]}"; then
-    
+
     # Install powerlevel10k font assets if not already installed
     if [ ! -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media" ]; then
       log "info" "Installing powerlevel10k font assets..."
       git clone --depth=1 https://github.com/romkatv/powerlevel10k-media.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media"
     fi
-    
+
     log "success" "Base packages installed successfully"
   else
     log "error" "Failed to install base packages"
     exit 1
   fi
 
-    # AUR packages
+  # AUR packages
   local aur_packages=(
     "ttf-source-code-pro"
     "ttf-consolas"
     "ttf-monaco"
     "ttf-meslo-nerd-font"
   )
-  
+
   # Install yay if not already installed
-  if ! command -v yay &> /dev/null; then
+  if ! command -v yay &>/dev/null; then
     log "info" "Installing yay..."
 
     sudo pacman -S --noconfirm base-devel
-    
+
     # Clone yay repository
     git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin
     cd /tmp/yay-bin
-    
+
     # Build and install yay
     makepkg -si --noconfirm
-    
+
     # Clean up
-    cd - > /dev/null
+    cd - >/dev/null
     rm -rf /tmp/yay-bin
   fi
 
   # Install AUR packages
   log "info" "Installing AUR packages..."
   yay -S --noconfirm "${aur_packages[@]}"
-  
+
   # Install oh-my-zsh and powerlevel10k if not already installed
   if [ ! -d "$HOME/.oh-my-zsh" ]; then
     log "info" "Installing oh-my-zsh..."
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
   fi
-  
+
   if [ ! -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]; then
     log "info" "Installing powerlevel10k..."
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
   fi
-  
+
   # Set zsh as default shell
   if [ "$SHELL" != "/usr/bin/zsh" ]; then
     log "info" "Setting zsh as default shell..."
@@ -328,6 +328,58 @@ install_base_packages() {
     log "info" "Installing Ax-Shell..."
     curl -fsSL https://raw.githubusercontent.com/Axenide/Ax-Shell/main/install.sh | bash
   fi
+
+  # Configure SDDM for Hyprland
+  log "info" "Configuring SDDM for Hyprland..."
+
+  # Create SDDM configuration directory if it doesn't exist
+  sudo mkdir -p /etc/sddm.conf.d
+
+  # Create SDDM configuration
+  sudo tee /etc/sddm.conf.d/hyprland.conf >/dev/null <<'EOF'
+[General]
+Current=Hyprland
+
+[Theme]
+Current=breeze
+
+[X11]
+ServerArguments=-nolisten tcp
+
+[Autologin]
+User=$USER
+Session=Hyprland
+EOF
+
+  # Create Hyprland session file
+  sudo tee /usr/share/xsessions/hyprland.desktop >/dev/null <<'EOF'
+[Desktop Entry]
+Name=Hyprland
+Comment=Hyprland
+Exec=hyprland
+TryExec=hyprland
+Type=Application
+Keywords=wayland;window manager;hyprland;
+EOF
+
+  # Create Hyprlock service file
+  sudo tee /etc/systemd/system/hyprlock.service >/dev/null <<'EOF'
+[Unit]
+Description=Hyprlock Service
+After=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/hyprlock
+
+[Install]
+WantedBy=display-manager.service
+EOF
+
+  # Enable Hyprlock service
+  sudo systemctl enable hyprlock.service
+
+  log "success" "SDDM configured for Hyprland with Hyprlock"
 }
 
 #===============================================================================
@@ -337,37 +389,37 @@ install_base_packages() {
 # Initialize dotfiles repository with existing configs
 init_dotfiles() {
   log "info" "Initializing dotfiles repository..."
-  
+
   # Create repository structure
   mkdir -p "$DOTFILES_DIR/home"
   mkdir -p "$DOTFILES_DIR/config"
-  
+
   # Copy home config files
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local system_path="$HOME/$dest"
     local repo_path="$DOTFILES_DIR/home/$src"
-    
+
     if [ -e "$system_path" ]; then
       copy_to_repo "$system_path" "$repo_path"
     else
       log "warn" "File not found: $system_path"
     fi
   done
-  
+
   # Copy config directories
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local system_path="$CONFIG_DIR/$dest"
     local repo_path="$DOTFILES_DIR/config/$src"
-    
+
     if [ -e "$system_path" ]; then
       copy_to_repo "$system_path" "$repo_path"
     else
       log "warn" "Directory not found: $system_path"
     fi
   done
-  
+
   log "info" "Repository initialized at $DOTFILES_DIR"
   log "info" "You might want to commit the changes:"
   log "info" "git -C \"$DOTFILES_DIR\" add ."
@@ -377,103 +429,103 @@ init_dotfiles() {
 # Copy dotfiles to the system
 install_dotfiles() {
   log "info" "Copying dotfiles..."
-  
+
   # Create backup directory
   mkdir -p "$BACKUP_DIR"
-  
+
   # Copy home config files
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local repo_path="$DOTFILES_DIR/home/$src"
     local system_path="$HOME/$dest"
-    
+
     if [ -e "$repo_path" ]; then
       copy_file "$repo_path" "$system_path"
     else
       log "warn" "File not found in repository: $repo_path"
     fi
   done
-  
+
   # Copy config directories
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local repo_path="$DOTFILES_DIR/config/$src"
     local system_path="$CONFIG_DIR/$dest"
-    
+
     if [ -e "$repo_path" ]; then
       copy_file "$repo_path" "$system_path"
     else
       log "warn" "Directory not found in repository: $repo_path"
     fi
   done
-  
+
   # Set up SDDM for Hyprland
   if [ -d "/etc/sddm.conf.d" ]; then
     log "info" "Setting up SDDM for Hyprland..."
-    
+
     # Create SDDM config directory in repo if it doesn't exist
     mkdir -p "$DOTFILES_DIR/config/sddm/sddm.conf.d"
-    
+
     # Create or update wayland.conf for SDDM
     local sddm_wayland_conf="$DOTFILES_DIR/config/sddm/sddm.conf.d/wayland.conf"
-    echo "[General]" > "$sddm_wayland_conf"
-    echo "DisplayServer=wayland" >> "$sddm_wayland_conf"
-    echo "" >> "$sddm_wayland_conf"
-    echo "[Wayland]" >> "$sddm_wayland_conf"
-    echo "SessionDir=/usr/share/wayland-sessions" >> "$sddm_wayland_conf"
-    echo "" >> "$sddm_wayland_conf"
-    echo "[Autologin]" >> "$sddm_wayland_conf"
-    echo "User=$(whoami)" >> "$sddm_wayland_conf"
-    echo "Session=hyprland.desktop" >> "$sddm_wayland_conf"
-    echo "Relogin=false" >> "$sddm_wayland_conf"
-    
+    echo "[General]" >"$sddm_wayland_conf"
+    echo "DisplayServer=wayland" >>"$sddm_wayland_conf"
+    echo "" >>"$sddm_wayland_conf"
+    echo "[Wayland]" >>"$sddm_wayland_conf"
+    echo "SessionDir=/usr/share/wayland-sessions" >>"$sddm_wayland_conf"
+    echo "" >>"$sddm_wayland_conf"
+    echo "[Autologin]" >>"$sddm_wayland_conf"
+    echo "User=$(whoami)" >>"$sddm_wayland_conf"
+    echo "Session=hyprland.desktop" >>"$sddm_wayland_conf"
+    echo "Relogin=false" >>"$sddm_wayland_conf"
+
     # Check if /etc/sddm.conf.d/wayland.conf already exists
     local system_sddm_wayland_conf="/etc/sddm.conf.d/wayland.conf"
     if [ -e "$system_sddm_wayland_conf" ]; then
       # Backup the existing file
       backup "$system_sddm_wayland_conf"
     fi
-    
+
     # Create the destination directory if it doesn't exist
     if [ ! -d "/etc/sddm.conf.d" ]; then
       sudo mkdir -p "/etc/sddm.conf.d"
     fi
-    
+
     # Copy the file to the system with sudo
     sudo cp "$sddm_wayland_conf" "$system_sddm_wayland_conf"
     log "info" "SDDM configured for Hyprland"
-    
+
     # Enable SDDM service
     log "info" "Enabling SDDM service..."
     sudo systemctl enable sddm.service
   fi
-  
+
   log "info" "Dotfiles installation complete"
 }
 
 # Update repository with latest local changes
 update_repo() {
   log "info" "Updating repository with latest local changes..."
-  
+
   # Update home config files
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local system_path="$HOME/$dest"
     local repo_path="$DOTFILES_DIR/home/$dest"
-    
+
     # Only update if it's not a symlink (meaning it wasn't installed by this script)
     # or if the symlink doesn't point to our repo
     if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
       copy_to_repo "$system_path" "$repo_path"
     fi
   done
-  
+
   # Update config directories
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local system_path="$CONFIG_DIR/$dest"
     local repo_path="$DOTFILES_DIR/config/$src"
-    
+
     # Only update if it's not a symlink (meaning it wasn't installed by this script)
     # or if the symlink doesn't point to our repo
     if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
@@ -484,7 +536,7 @@ update_repo() {
       copy_to_repo "$system_path" "$repo_path"
     fi
   done
-  
+
   log "info" "Repository update complete"
   log "info" "You might want to commit the changes:"
   log "info" "git -C \"$DOTFILES_DIR\" add ."
@@ -498,21 +550,21 @@ list_dotfiles() {
     local dest="${HOME_CONFIG_FILES[$src]}"
     local repo_path="$DOTFILES_DIR/home/$src"
     local system_path="$HOME/$dest"
-    
+
     if [ -e "$repo_path" ]; then
       echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
     else
       echo -e "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
     fi
   done
-  
+
   echo
   log "info" "Managed config directories:"
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local repo_path="$DOTFILES_DIR/config/$src"
     local system_path="$CONFIG_DIR/$dest"
-    
+
     if [ -e "$repo_path" ]; then
       echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
     else
@@ -528,27 +580,27 @@ list_dotfiles() {
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -v|--verbose)
-      VERBOSE=1
-      shift
-      ;;
-    -f|--force)
-      FORCE=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    init|install|update|list|help)
-      COMMAND="$1"
-      shift
-      ;;
-    *)
-      log "error" "Unknown option: $1"
-      usage
-      exit 1
-      ;;
+  -v | --verbose)
+    VERBOSE=1
+    shift
+    ;;
+  -f | --force)
+    FORCE=1
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  init | install | update | list | help)
+    COMMAND="$1"
+    shift
+    ;;
+  *)
+    log "error" "Unknown option: $1"
+    usage
+    exit 1
+    ;;
   esac
 done
 
@@ -561,34 +613,33 @@ fi
 
 # Execute the command
 case "$COMMAND" in
-  init)
-    check_arch_linux
-    check_dependencies
-    init_dotfiles
-    ;;
-  install)
-    check_arch_linux
-    check_dependencies
-    install_base_packages
-    install_dotfiles
-    ;;
-  update)
-    check_arch_linux
-    check_dependencies
-    update_repo
-    ;;
-  list)
-    list_dotfiles
-    ;;
-  help)
-    usage
-    ;;
-  *)
-    log "error" "Unknown command: $COMMAND"
-    usage
-    exit 1
-    ;;
+init)
+  check_arch_linux
+  check_dependencies
+  init_dotfiles
+  ;;
+install)
+  check_arch_linux
+  check_dependencies
+  install_base_packages
+  install_dotfiles
+  ;;
+update)
+  check_arch_linux
+  check_dependencies
+  update_repo
+  ;;
+list)
+  list_dotfiles
+  ;;
+help)
+  usage
+  ;;
+*)
+  log "error" "Unknown command: $COMMAND"
+  usage
+  exit 1
+  ;;
 esac
 
 exit 0
-
