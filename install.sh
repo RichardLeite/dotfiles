@@ -322,7 +322,7 @@ install_base_packages() {
   # Set zsh as default shell
   if [ "$SHELL" != "/usr/bin/zsh" ]; then
     log "info" "Setting zsh as default shell..."
-    chsh -s /usr/bin/zsh
+    sudo chsh -s /usr/bin/zsh "$USER"
   fi
 
   # Install Ax-Shell if not already installed
