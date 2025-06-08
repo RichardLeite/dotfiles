@@ -352,6 +352,8 @@ Session=Hyprland
 EOF
 
   # Create Hyprland session file
+  # Create xsessions directory if it doesn't exist
+  sudo mkdir -p /usr/share/xsessions
   sudo tee /usr/share/xsessions/hyprland.desktop >/dev/null <<'EOF'
 [Desktop Entry]
 Name=Hyprland
