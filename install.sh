@@ -9,7 +9,7 @@
 # 3. Updating the repository with the latest local changes
 # 4. Backing up existing configs before overwriting
 #
-# Author: Richard C.
+# Author: Richard Leite.
 # Created: June 2025
 #===============================================================================
 
@@ -26,8 +26,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Script variables
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKUP_DIR="$HOME/.dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/files"
+BACKUP_DIR="$DOTFILES_DIR/backups/$(date +%Y%m%d_%H%M%S)"
 CONFIG_DIR="$HOME/.config"
 VERBOSE=0
 FORCE=0
@@ -35,20 +35,20 @@ FORCE=0
 # Configuration file mapping (source:destination)
 # These are relative paths from the dotfiles repo to the home directory
 declare -A HOME_CONFIG_FILES=(
-  ["zshrc"]=".zshrc"
-  ["bashrc"]=".bashrc"
-  ["p10k.zsh"]=".p10k.zsh"
+  [".zshrc"]=".zshrc"
+  [".bashrc"]=".bashrc"
+  [".p10k.zsh"]=".p10k.zsh"
 )
 
 # Configuration directories mapping (source:destination)
-# These are relative paths from the dotfiles repo to the ~/.config directory
+# These are relative paths from the ~/.config directory to the dotfiles repo
 declare -A CONFIG_DIRS=(
-  ["hypr"]="hypr"
-  ["kitty"]="kitty"
-  ["cava"]="cava"
-  ["warp-terminal"]="warp-terminal"
-  ["matugen"]="matugen"
-  ["sddm"]="sddm"
+  ["hypr"]=".config/hypr"
+  ["kitty"]=".config/kitty"
+  ["cava"]=".config/cava"
+  ["warp-terminal"]=".config/warp-terminal"
+  ["matugen"]=".config/matugen"
+  ["sddm"]=".config/sddm"
 )
 
 #===============================================================================
@@ -90,6 +90,7 @@ log() {
   "warn") color="${YELLOW}" ;;
   "error") color="${RED}" ;;
   "debug") color="${CYAN}" ;;
+  "success") color="${GREEN}" ;;
   *) color="${NC}" ;;
   esac
 
@@ -154,7 +155,7 @@ check_dependencies() {
 # Backup a file or directory using rsync
 backup() {
   local path="$1"
-  local backup_path="${BACKUP_DIR}${path}"
+  local backup_path="$BACKUP_DIR/$(basename "$path")"
 
   if [ ! -e "$path" ]; then
     log "debug" "Nothing to backup at $path"
@@ -162,7 +163,7 @@ backup() {
   fi
 
   # Create backup directory structure
-  mkdir -p "$(dirname "$backup_path")"
+  mkdir -p "$BACKUP_DIR"
 
   # Use rsync for efficient backup
   rsync -av --delete "$path" "$backup_path"
@@ -221,8 +222,15 @@ copy_file() {
 copy_to_repo() {
   local source="$1"
   local dest="$2"
-  local repo_path="$DOTFILES_DIR/config/$dest"
-  local system_path="$CONFIG_DIR/$source"
+
+  # For home config files, source is already a full path
+  if [[ "$source" == "$HOME"/* ]]; then
+    local system_path="$source"
+    local repo_path="$DOTFILES_DIR/$(basename "$source")"
+  else
+    local system_path="$CONFIG_DIR/$source"
+    local repo_path="$DOTFILES_DIR/$dest"
+  fi
 
   if [ ! -e "$system_path" ]; then
     log "error" "Source does not exist: $system_path"
@@ -250,6 +258,7 @@ install_base_packages() {
     "kitty"
     "nautilus"
     "zsh"
+    "gnome-keyring"
     "ttf-jetbrains-mono"
     "ttf-fira-code"
     "ttf-hack"
@@ -269,6 +278,12 @@ install_base_packages() {
       log "info" "Installing powerlevel10k font assets..."
       git clone --depth=1 https://github.com/romkatv/powerlevel10k-media.git "$HOME/.oh-my-zsh/custom/themes/powerlevel10k-media"
     fi
+
+    # Configure gnome-keyring as default keyring
+    log "info" "Configuring gnome-keyring as default keyring..."
+    mkdir -p "$HOME/.config/environment.d"
+    echo "GNOME_KEYRING_CONTROL=1" >>"$HOME/.config/environment.d/keyring.conf"
+    echo "SSH_AUTH_SOCK=$XDG_RUNTIME_DIR/gcr/ssh" >>"$HOME/.config/environment.d/keyring.conf"
 
     log "success" "Base packages installed successfully"
   else
@@ -339,18 +354,18 @@ install_base_packages() {
 
   # Create SDDM configuration
   sudo tee /etc/sddm.conf.d/hyprland.conf >/dev/null <<'EOF'
-[General]
-Current=Hyprland
+    [General]
+    Current=Hyprland
 
-[Theme]
-Current=breeze
+    [Theme]
+    Current=breeze
 
-[X11]
-ServerArguments=-nolisten tcp
+    [X11]
+    ServerArguments=-nolisten tcp
 
-[Autologin]
-User=$USER
-Session=Hyprland
+    [Autologin]
+    User=$USER
+    Session=Hyprland
 EOF
 
   # Create Hyprland session file
@@ -434,44 +449,40 @@ init_dotfiles() {
 install_dotfiles() {
   log "info" "Copying dotfiles..."
 
-  # Create backup directory
-  mkdir -p "$BACKUP_DIR"
-
-  # Copy home config files
-  for src in "${!HOME_CONFIG_FILES[@]}"; do
-    local dest="${HOME_CONFIG_FILES[$src]}"
-    local repo_path="$DOTFILES_DIR/home/$src"
-    local system_path="$HOME/$dest"
-
-    if [ -e "$repo_path" ]; then
-      copy_file "$repo_path" "$system_path"
-    else
-      log "warn" "File not found in repository: $repo_path"
-    fi
-  done
-
-  # Copy config directories
-  for src in "${!CONFIG_DIRS[@]}"; do
-    local dest="${CONFIG_DIRS[$src]}"
-    local repo_path="$DOTFILES_DIR/config/$src"
-    local system_path="$CONFIG_DIR/$dest"
-
-    if [ -e "$repo_path" ]; then
-      copy_file "$repo_path" "$system_path"
-    else
-      log "warn" "Directory not found in repository: $repo_path"
-    fi
-  done
-
-  # Copy Ax-Shell config separately
-  local ax_shell_config_repo="$DOTFILES_DIR/config/Ax-Shell/config/config.json"
-  local ax_shell_config_system="$CONFIG_DIR/Ax-Shell/config/config.json"
-
-  if [ -e "$ax_shell_config_repo" ]; then
-    copy_file "$ax_shell_config_repo" "$ax_shell_config_system"
-  else
-    log "warn" "Ax-Shell config not found in repository: $ax_shell_config_repo"
+  # Ensure files directory exists
+  if [ ! -d "$DOTFILES_DIR" ]; then
+    log "error" "Dotfiles directory $DOTFILES_DIR does not exist"
+    exit 1
   fi
+
+  # List files to be installed
+  log "info" "Listing dotfiles to be installed..."
+  local dotfiles=()
+  while IFS= read -r -d '' file; do
+    dotfiles+=("$file")
+  done < <(find "$DOTFILES_DIR" -type f -print0)
+
+  # Install each dotfile
+  for file in "${dotfiles[@]}"; do
+    # Remove the base dotfiles directory from the path
+    relative_path="${file#$DOTFILES_DIR/}"
+    target_path="$HOME/$relative_path"
+
+    # Create target directory if it doesn't exist
+    target_dir=$(dirname "$target_path")
+    create_dir "$target_dir"
+
+    # Backup existing file if it exists
+    if [ -f "$target_path" ] || [ -L "$target_path" ]; then
+      backup "$target_path"
+    fi
+
+    # Copy file
+    log "info" "Installing $relative_path"
+    copy_file "$file" "$target_path"
+  done
+
+  log "success" "Dotfiles installation completed"
 
   # Set up SDDM for Hyprland
   log "info" "Setting up SDDM for Hyprland..."
@@ -486,17 +497,17 @@ install_dotfiles() {
   fi
 
   # Create SDDM configuration
-  sudo tee "$system_sddm_conf" >/dev/null <<'EOF'
-[General]
-DisplayServer=wayland
+  sudo tee "$system_sddm_conf" >/dev/null <<EOF
+    [General]
+    DisplayServer=wayland
 
-[Wayland]
-SessionDir=/usr/share/wayland-sessions
+    [Wayland]
+    SessionDir=/usr/share/wayland-sessions
 
-[Autologin]
-User=$(whoami)
-Session=hyprland.desktop
-Relogin=false
+    [Autologin]
+    User=$(whoami)
+    Session=hyprland.desktop
+    Relogin=false
 EOF
 
   log "info" "SDDM configured for Hyprland"
@@ -510,56 +521,61 @@ EOF
 
 # Update repository with latest local changes
 update_repo() {
-  log "info" "Updating repository with latest local changes..."
+  # Specific programs and configurations to copy
+  local specific_configs=(
+    # Shell and terminal
+    "$HOME/.zshrc"
+    "$HOME/.p10k.zsh"
+    "$HOME/.config/zsh"
+    "$HOME/.config/starship.toml"
 
-  # Update home config files
-  for src in "${!HOME_CONFIG_FILES[@]}"; do
-    local dest="${HOME_CONFIG_FILES[$src]}"
-    local system_path="$HOME/$dest"
-    local repo_path="$DOTFILES_DIR/home/$dest"
+    # Development tools
+    "$HOME/.gitconfig"
+    "$HOME/.npmrc"
 
-    # Only update if it's not a symlink (meaning it wasn't installed by this script)
-    # or if the symlink doesn't point to our repo
-    if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
-      copy_to_repo "$system_path" "$repo_path"
-    fi
-  done
+    # Window manager and terminal
+    "$HOME/.config/hypr"
+    "$HOME/.config/kitty"
 
-  # Update config directories
-  for src in "${!CONFIG_DIRS[@]}"; do
-    local dest="${CONFIG_DIRS[$src]}"
-    local system_path="$CONFIG_DIR/$dest"
-    local repo_path="$DOTFILES_DIR/config/$src"
+    # Editor
+    "$HOME/.config/nvim"
+    "$HOME/.config/Code - OSS"
+  )
 
-    # Only update if it's not a symlink (meaning it wasn't installed by this script)
-    # or if the symlink doesn't point to our repo
-    if [ -e "$system_path" ] && { [ ! -L "$system_path" ] || [ "$(readlink -f "$system_path")" != "$(readlink -f "$repo_path")" ]; }; then
-      # Remove old copy in repo if it exists
-      if [ -e "$repo_path" ]; then
-        rm -rf "$repo_path"
-      fi
-      copy_to_repo "$system_path" "$repo_path"
-    fi
-  done
-
-  # Update Ax-Shell config separately
-  local ax_shell_config_system="$CONFIG_DIR/Ax-Shell/config/config.json"
-  local ax_shell_config_repo="$DOTFILES_DIR/config/Ax-Shell/config/config.json"
-
-  # Only update if it's not a symlink (meaning it wasn't installed by this script)
-  # or if the symlink doesn't point to our repo
-  if [ -e "$ax_shell_config_system" ] && { [ ! -L "$ax_shell_config_system" ] || [ "$(readlink -f "$ax_shell_config_system")" != "$(readlink -f "$ax_shell_config_repo")" ]; }; then
-    # Remove old copy in repo if it exists
-    if [ -e "$ax_shell_config_repo" ]; then
-      rm -rf "$ax_shell_config_repo"
-    fi
-    copy_to_repo "$ax_shell_config_system" "$ax_shell_config_repo"
+  # Ensure files directory exists
+  if [ ! -d "$DOTFILES_DIR" ]; then
+    mkdir -p "$DOTFILES_DIR"
+    log "info" "Created dotfiles directory: $DOTFILES_DIR"
   fi
 
-  log "info" "Repository update complete"
-  log "info" "You might want to commit the changes:"
-  log "info" "git -C \"$DOTFILES_DIR\" add ."
-  log "info" "git -C \"$DOTFILES_DIR\" commit -m \"Update dotfiles\""
+  # Find and copy files from home directory to repository
+  log "info" "Updating repository with latest local changes..."
+
+  # Copy each specified configuration
+  for config in "${specific_configs[@]}"; do
+    # Check if the file or directory exists
+    if [ -e "$config" ]; then
+      # Remove $HOME from the path to create relative path
+      relative_path="${config#$HOME/}"
+      repo_path="$DOTFILES_DIR/$relative_path"
+
+      # Create target directory if it doesn't exist
+      repo_dir=$(dirname "$repo_path")
+      create_dir "$repo_dir"
+
+      # Copy file or directory to repository
+      log "info" "Copying $relative_path to repository"
+
+      # Use cp with appropriate flags for files and directories
+      if [ -d "$config" ]; then
+        cp -rp "$config" "$repo_path"
+      else
+        cp -p "$config" "$repo_path"
+      fi
+    fi
+  done
+
+  log "success" "Repository update completed"
 }
 
 # List managed dotfiles

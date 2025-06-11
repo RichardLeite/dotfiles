@@ -1,0 +1,21 @@
+# Configuration directories to exclude
+.config/microsoft-edge/
+.config/chromium/
+.config/BraveSoftware/
+.config/google-chrome/
+.config/Code/
+
+# VSCode settings
+.vscode/
+
+# SSH keys and browser data
+.ssh/
+
+# Temporary and cache files
+*~
+*.swp
+*.swo
+
+# System files
+.DS_Store
+Thumbs.db
