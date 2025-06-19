@@ -1,57 +1,5 @@
 #!/usr/bin/env bash
 
-# Configurações iniciais
-VERBOSE=0
-FORCE=0
-
-# Processar argumentos de linha de comando
-while [[ $# -gt 0 ]]; do
-  case $1 in
-  -v | --verbose)
-    VERBOSE=1
-    shift
-    ;;
-  -f | --force)
-    FORCE=1
-    shift
-    ;;
-  *)
-    # Ignorar outros argumentos por enquanto
-    shift
-    ;;
-  esac
-done
-
-# Função de log com níveis
-log() {
-  local level=$1
-  local message=$2
-
-  case $level in
-  debug)
-    [ "$VERBOSE" -eq 1 ] && echo "[DEBUG] $message" >&2
-    ;;
-  info)
-    echo "[INFO] $message"
-    ;;
-  warn)
-    echo "[WARN] $message" >&2
-    ;;
-  error)
-    echo "[ERROR] $message" >&2
-    ;;
-  *)
-    echo "[LOG] $message"
-    ;;
-  esac
-}
-
-# Log inicial apenas em modo verboso
-log debug "Iniciando script em $(date)"
-log debug "Diretório atual: $(pwd)"
-log debug "Usuário: $(whoami)"
-log debug "Argumentos: $@"
-
 #===============================================================================
 # dotfiles.sh - Dotfiles Management Script for Arch Linux with Hyprland
 #===============================================================================
@@ -77,11 +25,16 @@ check_root() {
     log "error" "This script should not be run as root"
     exit 1
   fi
+
+  # Check if we have sudo privileges
+  if ! sudo -n true 2>/dev/null; then
+    log "warn" "No sudo privileges detected. Some operations may fail."
+  fi
 }
 
 # Verify dependencies
 check_dependencies() {
-  local required=("git" "rsync" "ln")
+  local required=("git" "rsync" "ln" "sudo" "pacman")
   local missing=()
   local retries=3
   local delay=2
@@ -135,28 +88,28 @@ cleanup() {
 #===============================================================================
 # Force color output
 if [ -t 1 ]; then
-  # Use tput for better compatibility with different terminals
-  if command -v tput >/dev/null 2>&1; then
-    RED=$(tput setaf 1)
-    GREEN=$(tput setaf 2)
-    YELLOW=$(tput setaf 3)
-    BLUE=$(tput setaf 4)
-    MAGENTA=$(tput setaf 5)
-    CYAN=$(tput setaf 6)
-    NC=$(tput sgr0) # Reset color
-  else
-    # Fallback to ANSI color codes if tput is not available
-    RED='\e[0;31m'
-    GREEN='\e[0;32m'
-    YELLOW='\e[0;33m'
-    BLUE='\e[0;34m'
-    MAGENTA='\e[0;35m'
-    CYAN='\e[0;36m'
-    NC='\e[0m' # Reset color
-  fi
+    # Use tput for better compatibility with different terminals
+    if command -v tput >/dev/null 2>&1; then
+        RED=$(tput setaf 1)
+        GREEN=$(tput setaf 2)
+        YELLOW=$(tput setaf 3)
+        BLUE=$(tput setaf 4)
+        MAGENTA=$(tput setaf 5)
+        CYAN=$(tput setaf 6)
+        NC=$(tput sgr0) # Reset color
+    else
+        # Fallback to ANSI color codes if tput is not available
+        RED='\e[0;31m'
+        GREEN='\e[0;32m'
+        YELLOW='\e[0;33m'
+        BLUE='\e[0;34m'
+        MAGENTA='\e[0;35m'
+        CYAN='\e[0;36m'
+        NC='\e[0m' # Reset color
+    fi
 else
-  # No colors if not a terminal
-  RED='' GREEN='' YELLOW='' BLUE='' MAGENTA='' CYAN='' NC=''
+    # No colors if not a terminal
+    RED='' GREEN='' YELLOW='' BLUE='' MAGENTA='' CYAN='' NC=''
 fi
 
 # ANSI color codes for logging
@@ -170,8 +123,7 @@ trace() { [ "$VERBOSE" -eq 1 ] && printf "%b\n" "${CYAN}TRACE: $1${NC}" >&2; }
 #===============================================================================
 # Script variables
 #===============================================================================
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FILES_DIR="$DOTFILES_DIR/files"
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/files"
 REPO_ROOT="$(dirname "$DOTFILES_DIR")"
 BACKUP_DIR="$REPO_ROOT/backups/$(date +%Y%m%d_%H%M%S)"
 BACKUP_UPDATE_DIR="$BACKUP_DIR/update"
@@ -189,38 +141,6 @@ CACHE_TIMEOUT=86400 # 24 hours in seconds
 
 # Create cache directory
 mkdir -p "$CACHE_DIR"
-
-#===============================================================================
-# Configuration file mapping (source:destination)
-#===============================================================================
-# These are relative paths from the dotfiles repo to the home directory
-declare -gA HOME_CONFIG_FILES=(
-  [".zshrc"]=".zshrc"
-  [".bashrc"]=".bashrc"
-  [".p10k.zsh"]=".p10k.zsh"
-  [".gitconfig"]=".gitconfig"
-  [".npmrc"]=".npmrc"
-  [".ssh/id_ed25519"]=".ssh/id_ed25519"
-  [".ssh/id_ed25519.pub"]=".ssh/id_ed25519.pub"
-  [".ssh/config"]=".ssh/config"
-)
-
-#===============================================================================
-# Configuration directories mapping (source:destination)
-#===============================================================================
-# These are relative paths from the ~/.config directory to the dotfiles repo
-# The destination paths are relative to the files directory
-declare -A CONFIG_DIRS=(
-  ["hypr"]="hypr"
-  ["kitty"]="kitty"
-  ["cava"]="cava"
-  ["warp-terminal"]="warp-terminal"
-  ["matugen"]="matugen"
-  ["sddm"]="sddm"
-  ["Ax-Shell"]="Ax-Shell"
-  ["nvim"]="nvim"
-  ["Code - OSS"]="Code - OSS"
-)
 
 #===============================================================================
 # Backup functions
@@ -321,6 +241,48 @@ backup_system_config() {
 #===============================================================================
 # Copy functions
 #===============================================================================
+copy_file() {
+  local source="$1"
+  local dest="$2"
+  local rsync_flags="-av --delete --ignore-existing"
+
+  if [ "$VERBOSE" -eq 1 ]; then
+    rsync_flags="$rsync_flags -v"
+  fi
+
+  if [ "$FORCE" -eq 1 ]; then
+    rsync_flags="$rsync_flags --force"
+  fi
+
+  if [ ! -e "$source" ]; then
+    log "error" "Source does not exist: $source"
+    return 1
+  fi
+
+  # Create destination directory
+  local dest_dir=$(dirname "$dest")
+  create_dir "$dest_dir"
+
+  # Backup if file exists
+  if [ -f "$dest" ] || [ -L "$dest" ]; then
+    backup "$dest"
+  fi
+
+  # Copy using rsync
+  if [ -d "$source" ]; then
+    rsync $rsync_flags "$source/" "$dest/"
+  else
+    rsync $rsync_flags "$source" "$dest"
+  fi
+
+  # Set permissions if SSH config
+  if [[ "$dest" =~ \.ssh/ ]]; then
+    set_ssh_permissions "$dest"
+  fi
+
+  log "info" "Copied $source to $dest"
+  return 0
+}
 
 exclude_files() {
   local exclude_patterns=(
@@ -336,29 +298,168 @@ exclude_files() {
 }
 
 #===============================================================================
+# Configuration file mapping (source:destination)
+#===============================================================================
+# These are relative paths from the dotfiles repo to the home directory
+declare -A HOME_CONFIG_FILES=(
+  [".zshrc"]=".zshrc"
+  [".bashrc"]=".bashrc"
+  [".p10k.zsh"]=".p10k.zsh"
+  [".gitconfig"]=".gitconfig"
+  [".npmrc"]=".npmrc"
+  [".ssh/id_ed25519"]=".ssh/id_ed25519"
+  [".ssh/id_ed25519.pub"]=".ssh/id_ed25519.pub"
+  [".ssh/config"]=".ssh/config"
+)
+
+#===============================================================================
+# Configuration directories mapping (source:destination)
+#===============================================================================
+# These are relative paths from the ~/.config directory to the dotfiles repo
+# The destination paths are relative to the files directory
+declare -A CONFIG_DIRS=(
+  ["hypr"]="hypr"
+  ["kitty"]="kitty"
+  ["cava"]="cava"
+  ["warp-terminal"]="warp-terminal"
+  ["matugen"]="matugen"
+  ["sddm"]="sddm"
+  ["Ax-Shell"]="Ax-Shell"
+  ["nvim"]="nvim"
+  ["Code - OSS"]="Code - OSS"
+)
+
+#===============================================================================
 # Print usage information
 #===============================================================================
 usage() {
   echo -e "${BLUE}Usage:${NC} $0 [options] command"
   echo
-  printf "%b\n" "${BLUE}Commands:${NC}"
+  echo -e "${BLUE}Commands:${NC}"
   echo "  init       Initialize dotfiles repository with existing configs"
   echo "  install    Install dotfiles to the system"
   echo "  update     Update repository with latest local changes"
   echo "  list       List managed dotfiles"
   echo "  help       Show this help message"
   echo
-  printf "%b\n" "${BLUE}Options:${NC}"
+  echo -e "${BLUE}Options:${NC}"
   echo "  -v, --verbose   Enable verbose output"
   echo "  -f, --force     Force overwrite without confirmation"
   echo "  -h, --help      Show this help message"
   echo
-  printf "%b\n" "${BLUE}Examples:${NC}"
+  echo -e "${BLUE}Examples:${NC}"
   echo "  $0 init             # Initialize repository with existing configs"
   echo "  $0 install          # Install dotfiles to system"
   echo "  $0 update           # Update repository with local changes"
   echo "  $0 -f install       # Force install without confirmation"
   echo
+}
+
+#===============================================================================
+# Show interactive menu
+#===============================================================================
+show_menu() {
+  local options=(
+    "init" "Initialize dotfiles repository with existing configs"
+    "install" "Install dotfiles to the system"
+    "update" "Update repository with latest local changes"
+    "list" "List managed dotfiles"
+    "exit" "Exit the script"
+  )
+
+  while true; do
+    clear
+    echo -e "${BLUE}Dotfiles Management Script${NC}"
+    echo "============================="
+    echo
+
+    # Print menu options
+    for i in "${!options[@]}"; do
+      if [ $((i % 2)) -eq 0 ]; then
+        echo -e "${BLUE}[$((i / 2 + 1))]${NC} ${options[$i]} - ${options[$((i + 1))]}"
+      fi
+    done
+
+    echo
+    echo -e "${BLUE}Options:${NC}"
+    echo "  -v, --verbose   Enable verbose output"
+    echo "  -f, --force     Force overwrite without confirmation"
+    echo "  -h, --help      Show this help message"
+
+    echo
+    echo -n "${BLUE}Enter your choice (1-5) or option (-v, -f, -h): ${NC}"
+    read -r choice
+
+    # Handle options
+    case "$choice" in
+    -v | --verbose)
+      VERBOSE=1
+      continue
+      ;;
+    -f | --force)
+      FORCE=1
+      continue
+      ;;
+    -h | --help)
+      usage
+      continue
+      ;;
+    esac
+
+    # Handle menu choices
+    case "$choice" in
+    1)
+      COMMAND="init"
+      break
+      ;;
+    2)
+      COMMAND="install"
+      break
+      ;;
+    3)
+      COMMAND="update"
+      break
+      ;;
+    4)
+      COMMAND="list"
+      break
+      ;;
+    5)
+      exit 0
+      ;;
+    *)
+      echo -e "${RED}Invalid choice. Please try again.${NC}"
+      sleep 2
+      ;;
+    esac
+  done
+}
+
+#===============================================================================
+# Print log message
+#===============================================================================
+log() {
+  local level="$1"
+  local message="$2"
+  local caller="$(caller 1 | awk '{print $2}')"
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  # Use the appropriate color function based on the log level
+  case "$level" in
+    error) error "${caller}: ${message}" ;;
+    warn) warn "${caller}: ${message}" ;;
+    success) success "${caller}: ${message}" ;;
+    info) info "${caller}: ${message}" ;;
+    debug) debug "${caller}: ${message}" ;;
+    trace) trace "${caller}: ${message}" ;;
+    *) echo "${timestamp} [${level}] ${caller}: ${message}" ;;
+  esac
+
+  # Also write to log file if enabled (without color codes)
+  if [ -n "$LOG_FILE" ]; then
+    echo "${timestamp} [${level}] ${caller}: ${message}" >>"$LOG_FILE"
+  fi
 }
 
 #===============================================================================
@@ -370,6 +471,62 @@ check_arch_linux() {
     exit 1
   fi
 }
+
+#===============================================================================
+# Check required dependencies and install if missing
+#===============================================================================
+check_dependencies() {
+  local deps=("git" "ln" "rsync")
+  local missing=()
+  local installed=()
+
+  # Check which dependencies are missing
+  for dep in "${deps[@]}"; do
+    if ! command -v "$dep" &>/dev/null; then
+      missing+=("$dep")
+    else
+      installed+=("$dep")
+    fi
+  done
+
+  if [ ${#missing[@]} -gt 0 ]; then
+    log "warn" "Missing dependencies: ${missing[*]}"
+    log "info" "Installing missing dependencies..."
+
+    # Run sudo pacman -S with the missing dependencies
+    if sudo pacman -S --noconfirm "${missing[@]}"; then
+      log "info" "Dependencies installed successfully"
+    else
+      log "error" "Failed to install dependencies"
+      exit 1
+    fi
+  fi
+
+  if [ ${#installed[@]} -gt 0 ]; then
+    log "info" "Already installed: ${installed[*]}"
+  fi
+
+  log "info" "All required dependencies are installed"
+}
+
+# Backup a file or directory using rsync
+backup() {
+  local path="$1"
+  local backup_path="$BACKUP_DIR/$(basename "$path")"
+
+  if [ ! -e "$path" ]; then
+    log "debug" "Nothing to backup at $path"
+    return 0
+  fi
+
+  # Create backup directory structure
+  mkdir -p "$BACKUP_DIR"
+
+  # Use rsync for efficient backup
+  rsync -av --delete "$path" "$backup_path"
+  log "info" "Backed up $path to $backup_path"
+}
+
 # Create directory if it doesn't exist
 create_dir() {
   local dir="$1"
@@ -419,29 +576,13 @@ copy_file() {
   local dest_dir=$(dirname "$system_path")
   create_dir "$dest_dir"
 
-  # Ensure destination directory is writable
-  if [ ! -w "$dest_dir" ] && [ ! -w "$(dirname "$dest_dir")" ]; then
-    log "error" "Cannot write to destination directory: $dest_dir"
-    return 1
-  fi
-
-  # Handle existing destination
-  if [ -e "$system_path" ]; then
-    # If destination is a directory and source is a file, append filename to destination
-    if [ -d "$system_path" ] && [ -f "$repo_path" ]; then
-      system_path="${system_path}/$(basename "$repo_path")"
-      dest_dir=$(dirname "$system_path")
-      create_dir "$dest_dir"
+  # Backup existing file if it exists and is writable
+  if [ -f "$system_path" ] || [ -L "$system_path" ]; then
+    if [ ! -w "$system_path" ]; then
+      log "warn" "Destination is not writable: $system_path"
+      return 1
     fi
-
-    # Backup existing file if it's writable
-    if [ -f "$system_path" ] || [ -L "$system_path" ]; then
-      if [ ! -w "$system_path" ]; then
-        log "warn" "Destination is not writable: $system_path"
-        return 1
-      fi
-      backup "$system_path"
-    fi
+    backup "$system_path"
   fi
 
   # Use rsync for copying with appropriate flags
@@ -708,361 +849,188 @@ init_dotfiles() {
 }
 
 install_dotfiles() {
-  log "info" "Iniciando instalação dos dotfiles..."
+  log "info" "Installing dotfiles..."
 
-  # Usar variáveis globais já definidas
+  # Create backup directory for install
+  create_dir "$BACKUP_INSTALL_DIR"
 
-  # Criar diretório de backup
-  mkdir -p "$BACKUP_INSTALL_DIR"
-  log "debug" "Diretório de backup: $BACKUP_INSTALL_DIR"
-
-  # Fazer backup dos arquivos do sistema existentes
+  # Backup existing system files before installation
   backup_system_config "$BACKUP_TYPE_INSTALL"
 
-  # Instalar arquivos de configuração do diretório home
-  log "info" "Instalando arquivos de configuração do diretório home..."
+  # Install home config files using HOME_CONFIG_FILES mapping
+  log "info" "Installing home config files..."
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
-    local source_path="$DOTFILES_DIR/$(basename "$src")" # Ajustado para nova estrutura
+    local source_path="$DOTFILES_DIR/$src"
     local target_path="$HOME/$dest"
 
-    log "debug" "Processando: $dest"
-    log "debug" "  Origem: $source_path"
-    log "debug" "  Destino: $target_path"
+    if [ -e "$source_path" ]; then
+      # Backup existing file on system
+      if [ -e "$target_path" ]; then
+        backup "$target_path" "$BACKUP_TYPE_INSTALL"
+      fi
 
-    # Pular se o arquivo de origem não existir
-    if [ ! -e "$source_path" ]; then
-      log "warn" "Arquivo de origem não encontrado: $source_path"
-      continue
-    fi
-
-    # Fazer backup do arquivo existente
-    if [ -e "$target_path" ]; then
-      log "info" "Fazendo backup de $target_path"
-      backup "$target_path" "$BACKUP_TYPE_INSTALL"
-    fi
-
-    # Instalar o arquivo
-    log "info" "Instalando $dest"
-    if ! copy_file "$source_path" "$target_path"; then
-      log "error" "Falha ao instalar $dest"
+      log "info" "Installing $dest"
+      copy_file "$source_path" "$target_path"
+    else
+      log "warn" "Source file not found: $source_path"
     fi
   done
 
-  # Instalar diretórios de configuração
-  log "info" "Instalando diretórios de configuração..."
+  # Install config directories using CONFIG_DIRS mapping
+  log "info" "Installing config directories..."
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
-    local source_path="$DOTFILES_DIR/$(basename "$src")" # Ajustado para nova estrutura
+    local source_path="$DOTFILES_DIR/$dest"
     local target_path="$CONFIG_DIR/$src"
 
-    log "debug" "Processando diretório: $src"
-    log "debug" "  Origem: $source_path"
-    log "debug" "  Destino: $target_path"
+    if [ -e "$source_path" ]; then
+      # Backup existing directory on system
+      if [ -d "$target_path" ]; then
+        backup "$target_path" "$BACKUP_TYPE_INSTALL"
+      fi
 
-    # Pular se o diretório de origem não existir
-    if [ ! -e "$source_path" ]; then
-      log "warn" "Diretório de origem não encontrado: $source_path"
-      continue
-    fi
+      log "info" "Installing $src"
+      copy_file "$source_path" "$target_path"
 
-    # Fazer backup do diretório existente
-    if [ -d "$target_path" ]; then
-      log "info" "Fazendo backup de $target_path"
-      backup "$target_path" "$BACKUP_TYPE_INSTALL"
-    fi
+      # Set SSH permissions if needed
+      if [ "$src" = "ssh" ]; then
+        set_ssh_permissions "$CONFIG_DIR/$src" "$src"
+      fi
 
-    # Instalar o diretório
-    log "info" "Instalando $src"
-    if ! copy_file "$source_path" "$target_path"; then
-      log "error" "Falha ao instalar $src"
-      continue
-    fi
-
-    # Configurar permissões SSH se necessário
-    if [[ "$src" == *"ssh"* ]]; then
-      set_ssh_permissions "$target_path" "$src"
+      # Set SSH permissions for any SSH-related path
+      if [[ "$target_path" =~ \.ssh/ ]]; then
+        set_ssh_permissions "$HOME/.ssh" "$relative_path"
+      fi
+    else
+      log "warn" "Source directory not found: $source_path"
     fi
   done
 
-  # Configurar SDDM para Hyprland (apenas em sistemas systemd)
-  if command -v systemctl >/dev/null 2>&1; then
-    log "info" "Configurando SDDM para Hyprland..."
+  # Set SSH permissions for config directory
+  set_ssh_permissions "$CONFIG_DIR/.ssh" "config directory"
 
-    # Criar diretório de configuração do SDDM
-    local sddm_conf_dir="/etc/sddm.conf.d"
-    local system_sddm_conf="$sddm_conf_dir/wayland.conf"
+  log "success" "Dotfiles installation completed"
 
-    # Fazer backup da configuração existente
-    if [ -e "$system_sddm_conf" ]; then
-      log "info" "Fazendo backup da configuração SDDM existente"
-      backup "$system_sddm_conf" "$BACKUP_TYPE_INSTALL"
-    fi
+  # Set up SDDM for Hyprland
+  log "info" "Setting up SDDM for Hyprland..."
 
-    # Criar configuração do SDDM
-    log "info" "Criando configuração do SDDM"
-    sudo mkdir -p "$sddm_conf_dir"
+  # Create SDDM configuration directory if it doesn't exist
+  sudo mkdir -p /etc/sddm.conf.d
 
-    sudo tee "$system_sddm_conf" >/dev/null <<EOF
-[General]
-DisplayServer=wayland
-
-[Wayland]
-SessionDir=/usr/share/wayland-sessions
-
-[Autologin]
-User=$(whoami)
-Session=hyprland.desktop
-Relogin=false
-EOF
-
-    # Habilitar serviço SDDM
-    if systemctl list-unit-files | grep -q sddm.service; then
-      log "info" "Habilitando serviço SDDM..."
-      sudo systemctl enable sddm.service
-    else
-      log "warn" "Serviço SDDM não encontrado. Instale o pacote sddm se desejar usá-lo."
-    fi
-  else
-    log "warn" "Systemd não encontrado. Pule a configuração do SDDM."
+  # Backup existing SDDM config if it exists
+  local system_sddm_conf="/etc/sddm.conf.d/wayland.conf"
+  if [ -e "$system_sddm_conf" ]; then
+    backup "$system_sddm_conf" "$BACKUP_TYPE_INSTALL"
   fi
 
-  log "success" "Instalação dos dotfiles concluída com sucesso!"
-  log "info" "Backups salvos em: $BACKUP_INSTALL_DIR"
+  # Create SDDM configuration
+  sudo tee "$system_sddm_conf" >/dev/null <<EOF
+    [General]
+    DisplayServer=wayland
+
+    [Wayland]
+    SessionDir=/usr/share/wayland-sessions
+
+    [Autologin]
+    User=$(whoami)
+    Session=hyprland.desktop
+    Relogin=false
+EOF
+
+  log "info" "SDDM configured for Hyprland"
+
+  # Enable SDDM service
+  log "info" "Enabling SDDM service..."
+  sudo systemctl enable sddm.service
+
+  log "info" "Dotfiles installation complete"
 }
 
 # Update repository with latest local changes
 update_repo() {
-  echo -e "${BLUE}Atualizando repositório de dotfiles...${NC}"
+  log "info" "Updating repository with latest local changes..."
 
-  # Log de depuração das variáveis globais apenas em modo verbose
-  log "debug" "CONFIG_DIR: $CONFIG_DIR"
-  log "debug" "DOTFILES_DIR: $DOTFILES_DIR"
-  log "debug" "BACKUP_UPDATE_DIR: $BACKUP_UPDATE_DIR"
-  log "debug" "FILES_DIR: $FILES_DIR"
+  # Create backup directory for update
+  create_dir "$BACKUP_UPDATE_DIR"
 
-  # Criar diretório de backup
-  echo -n "• Preparando diretórios... "
-  mkdir -p "$BACKUP_UPDATE_DIR"
-
-  # Criar diretório files se não existir
-  mkdir -p "$FILES_DIR"
-
-  # Verificar permissões
-  if [ ! -w "$FILES_DIR" ]; then
-    echo -e "${RED}FALHA${NC}"
-    log "error" "Sem permissão de escrita em: $FILES_DIR"
-    exit 1
-  fi
-
-  echo -e "${GREEN}OK${NC}"
-  log "debug" "Estrutura de diretórios criada com sucesso"
-
-  # Adicionar diretório .vscode da home
-  echo -n "• Processando configurações do VSCode... "
-  if [ -d "$HOME/.vscode" ]; then
-    mkdir -p "$FILES_DIR/.vscode"
-    if [ -d "$FILES_DIR/.vscode" ]; then
-      # Fazer backup se já existir
-      if [ -d "$FILES_DIR/.vscode" ] && [ "$(ls -A "$FILES_DIR/.vscode" 2>/dev/null)" ]; then
-        local backup_vscode_dir="$BACKUP_UPDATE_DIR/vscode"
-        mkdir -p "$backup_vscode_dir"
-        if ! cp -r "$FILES_DIR/.vscode/" "$backup_vscode_dir/" 2>/dev/null; then
-          echo -e "${YELLOW}AVISO${NC} (Falha no backup)"
-          log "warn" "Falha ao fazer backup do diretório .vscode"
-        fi
-      fi
-
-      # Copiar conteúdo do .vscode
-      if rsync -aq --delete --exclude=.DS_Store --exclude=.git "$HOME/.vscode/" "$FILES_DIR/.vscode/"; then
-        echo -e "${GREEN}OK${NC}"
-      else
-        echo -e "${YELLOW}AVISO${NC} (Falha na cópia)"
-        log "warn" "Falha ao copiar diretório .vscode"
-      fi
-    else
-      echo -e "${RED}FALHA${NC} (Sem permissão)"
-      log "error" "Não foi possível criar o diretório $FILES_DIR/.vscode"
-    fi
-  else
-    echo -e "${YELLOW}Não encontrado${NC}"
-    log "debug" "Diretório $HOME/.vscode não encontrado"
-  fi
-
-  # Copiar arquivos de configuração do diretório home
-  echo -e "\n${BLUE}Atualizando arquivos de configuração:${NC}"
-  local updated_files=0
-  local skipped_files=0
-  local error_files=0
-
+  # Copy home config files using HOME_CONFIG_FILES mapping
   for src in "${!HOME_CONFIG_FILES[@]}"; do
     local dest="${HOME_CONFIG_FILES[$src]}"
     local system_path="$HOME/$dest"
-    local repo_path="$FILES_DIR/$(basename "$dest")"
-    local backup_file="$BACKUP_UPDATE_DIR/home/$(basename "$dest")"
-    local display_name="$(basename "$dest")"
+    local repo_path="$DOTFILES_DIR/$src"
 
-    # Criar diretório de destino se não existir
-    mkdir -p "$(dirname "$repo_path")"
-
-    log "debug" "Processando: $dest"
-    log "debug" "  Origem: $system_path"
-    log "debug" "  Destino: $repo_path"
-
-    # Pular se o arquivo de origem não existir
-    if [ ! -e "$system_path" ]; then
-      echo -e "  • ${YELLOW}$display_name${NC}: ${GRAY}Arquivo não encontrado na home${NC}"
-      log "debug" "Arquivo não encontrado: $system_path"
-      ((skipped_files++))
-      continue
-    fi
-
-    # Exibir progresso
-    echo -n "  • $display_name: "
-
-    # Fazer backup do arquivo existente no repositório
-    if [ -e "$repo_path" ]; then
-      if ! mkdir -p "$(dirname "$backup_file")"; then
-        echo -e "${RED}ERRO${NC} (falha ao criar diretório de backup)"
-        log "error" "Falha ao criar diretório de backup"
-        ((error_files++))
-        continue
+    if [ -e "$system_path" ]; then
+      # Backup existing file in repository
+      if [ -e "$repo_path" ]; then
+        backup "$repo_path" "$BACKUP_TYPE_UPDATE"
       fi
 
-      if ! cp -f "$repo_path" "$backup_file" 2>/dev/null; then
-        echo -e "${YELLOW}AVISO${NC} (falha no backup)"
-        log "warn" "Falha ao fazer backup do arquivo: $repo_path"
-      fi
-    fi
-
-    # Copiar o arquivo para o repositório
-    if cp -f "$system_path" "$repo_path" 2>/dev/null; then
-      echo -e "${GREEN}OK${NC} (atualizado)"
-      ((updated_files++))
+      copy_file "$system_path" "$repo_path"
     else
-      echo -e "${RED}ERRO${NC} (falha na cópia)"
-      log "error" "Falha ao copiar $system_path para $repo_path"
-      ((error_files++))
+      log "warn" "File not found: $system_path"
     fi
   done
 
-  # Resumo da operação
-  echo -e "\n${BLUE}Resumo:${NC}"
-  echo -e "  • ${GREEN}Atualizados:${NC} $updated_files arquivos"
-  if [ $skipped_files -gt 0 ]; then
-    echo -e "  • ${YELLOW}Pulados:${NC} $skipped_files (não encontrados)"
-  fi
-  if [ $error_files -gt 0 ]; then
-    echo -e "  • ${RED}Erros:${NC} $error_files arquivos"
-  fi
-
-  # Copiar diretórios de configuração usando o mapeamento CONFIG_DIRS
-  echo -e "\n${BLUE}Atualizando diretórios de configuração:${NC}"
-  local updated_dirs=0
-  local skipped_dirs=0
-  local error_dirs=0
-
+  # Copy config directories using CONFIG_DIRS mapping
   for src in "${!CONFIG_DIRS[@]}"; do
     local dest="${CONFIG_DIRS[$src]}"
     local system_path="$CONFIG_DIR/$src"
-    local repo_path="$FILES_DIR/$(basename "$src")"
-    local backup_dir="$BACKUP_UPDATE_DIR/$(basename "$src")"
-    local display_name="$(basename "$src")"
+    local repo_path="$DOTFILES_DIR/$dest"
 
-    log "debug" "Processando diretório: $src"
-    log "debug" "  Origem: $system_path"
-    log "debug" "  Destino: $repo_path"
-
-    # Exibir progresso
-    echo -n "  • $display_name: "
-
-    # Pular se o diretório de origem não existir
-    if [ ! -e "$system_path" ]; then
-      echo -e "${YELLOW}Não encontrado${NC}"
-      log "debug" "Diretório não encontrado: $system_path"
-      ((skipped_dirs++))
-      continue
-    fi
-
-    # Criar diretório de backup
-    mkdir -p "$backup_dir"
-
-    # Fazer backup do diretório existente no repositório
-    if [ -d "$repo_path" ]; then
-      if ! cp -r "$repo_path" "$backup_dir/" 2>/dev/null; then
-        echo -e "${YELLOW}AVISO${NC} (falha no backup)"
-        log "warn" "Falha ao fazer backup do diretório: $repo_path"
+    if [ -e "$system_path" ]; then
+      # Backup existing directory in repository
+      if [ -d "$repo_path" ]; then
+        backup "$repo_path" "$BACKUP_TYPE_UPDATE"
       fi
-    fi
 
-    # Criar diretório de destino
-    mkdir -p "$(dirname "$repo_path")"
+      log "info" "Copying config directory: $src"
+      # Use rsync directly instead of copy_to_repo for better control
+      local rsync_flags="-av --delete"
 
-    # Usar rsync para cópia síncrona (modo silencioso sem -v)
-    if rsync -aq --delete \
-      --exclude='.DS_Store' --exclude='.git' \
-      --exclude='node_modules' --exclude='__pycache__' \
-      "$system_path/" "$repo_path/"; then
-      echo -e "${GREEN}OK${NC} (atualizado)"
-      ((updated_dirs++))
+      # Create destination directory
+      create_dir "$repo_path"
+
+      # Copy directory contents
+      rsync $rsync_flags "$system_path/" "$repo_path/"
     else
-      echo -e "${RED}ERRO${NC} (falha na cópia)"
-      log "error" "Falha ao copiar diretório: $system_path"
-      ((error_dirs++))
+      log "warn" "Directory not found: $system_path"
     fi
   done
 
-  # Resumo da operação
-  echo -e "\n${BLUE}Resumo dos diretórios:${NC}"
-  echo -e "  • ${GREEN}Atualizados:${NC} $updated_dirs diretórios"
-  if [ $skipped_dirs -gt 0 ]; then
-    echo -e "  • ${YELLOW}Pulados:${NC} $skipped_dirs (não encontrados)"
-  fi
-  if [ $error_dirs -gt 0 ]; then
-    echo -e "  • ${RED}Erros:${NC} $error_dirs diretórios"
-  fi
+  # Copy additional config files
+  for config in "$HOME/.ssh" "$HOME/.gitconfig" "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if [ -e "$config" ]; then
+      # Remove $HOME from the path to create relative path
+      relative_path="${config#$HOME/}"
+      repo_path="$DOTFILES_DIR/$relative_path"
 
-  # Configurar permissões para diretórios sensíveis
-  echo -n "\n${BLUE}Configurando permissões...${NC} "
+      # Create target directory if it doesn't exist
+      repo_dir=$(dirname "$repo_path")
+      create_dir "$repo_dir"
 
-  if [ -d "$FILES_DIR/.ssh" ]; then
-    chmod 700 "$FILES_DIR/.ssh" 2>/dev/null
-    find "$FILES_DIR/.ssh" -type f -exec chmod 600 {} \; 2>/dev/null
-    find "$FILES_DIR/.ssh" -name "*.pub" -exec chmod 644 {} \; 2>/dev/null
+      # Copy file or directory to repository
+      log "info" "Copying $relative_path to repository"
 
-    # Verificar permissões
-    local ssh_perms
-    ssh_perms=$(stat -c "%a" "$FILES_DIR/.ssh" 2>/dev/null)
-    if [ "$ssh_perms" != "700" ]; then
-      echo -e "${YELLOW}AVISO${NC} (permissões .ssh: $ssh_perms)"
-      log "warn" "Permissões incorretas para .ssh ($ssh_perms)"
-    else
-      echo -e "${GREEN}OK${NC}"
+      # Use rsync for copying with appropriate flags
+      local rsync_flags="-av --delete"
+
+      # Add --delete flag only for directories
+      if [ ! -d "$config" ]; then
+        rsync_flags="$rsync_flags --no-delete"
+      fi
+
+      # Copy using rsync
+      rsync $rsync_flags "$config" "$repo_path"
+
+      # Set SSH permissions for repository
+      if [[ "$repo_path" =~ \.ssh/ ]]; then
+        set_ssh_permissions "$DOTFILES_DIR/.ssh" "$relative_path"
+      fi
     fi
-  else
-    echo -e "${GRAY}Nenhum diretório .ssh encontrado${NC}"
-  fi
+  done
 
-  # Verificar se há arquivos com permissões incorretas (apenas em modo verbose)
-  if [ "$VERBOSE" -eq 1 ]; then
-    local bad_perms
-    bad_perms=$(find "$FILES_DIR" -type f -perm /077 -print -quit 2>/dev/null)
-    if [ -n "$bad_perms" ]; then
-      echo -e "  ${YELLOW}• AVISO:${NC} Alguns arquivos têm permissões muito permissivas"
-      log "warn" "Arquivos com permissões muito permissivas encontrados"
-      log "debug" "Use 'find $FILES_DIR -type f -perm /077 -ls' para listá-los"
-    fi
-  fi
-
-  # Mensagem final
-  local updated_count=$(find "$FILES_DIR" -type f -newer "$BACKUP_UPDATE_DIR/.." 2>/dev/null | wc -l)
-  echo -e "\n${GREEN}✓ Atualização concluída com sucesso!${NC}"
-  echo -e "  • ${BLUE}Arquivos atualizados:${NC} $updated_count"
-  echo -e "  • ${BLUE}Backup salvo em:${NC} $BACKUP_UPDATE_DIR"
-
-  if [ $((updated_files + updated_dirs)) -eq 0 ] && [ $((skipped_files + skipped_dirs + error_files + error_dirs)) -eq 0 ]; then
-    echo -e "\n${YELLOW}ℹ  Nenhuma alteração foi necessária.${NC}"
-  fi
+  log "success" "Repository update completed"
 }
 
 set_ssh_permissions() {
@@ -1130,9 +1098,9 @@ list_dotfiles() {
     local system_path="$HOME/$dest"
 
     if [ -e "$repo_path" ]; then
-      printf "%b\n" "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
+      echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
     else
-      printf "%b\n" "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
+      echo -e "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
     fi
   done
 
@@ -1144,9 +1112,9 @@ list_dotfiles() {
     local system_path="$CONFIG_DIR/$dest"
 
     if [ -e "$repo_path" ]; then
-      printf "%b\n" "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
+      echo -e "${BLUE}$system_path${NC} -> ${GREEN}$repo_path${NC}"
     else
-      printf "%b\n" "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
+      echo -e "${BLUE}$system_path${NC} -> ${RED}Not in repository${NC}"
     fi
   done
 }
@@ -1165,93 +1133,67 @@ show_menu() {
 
   while true; do
     clear
-    # Cabeçalho do menu
-    echo -e "${BLUE}╔══════════════════════════════════════════╗"
-    echo -e "║${NC}       Dotfiles Management Script       ${BLUE}║"
-    echo -e "╚══════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}Dotfiles Management Script${NC}"
+    echo "============================="
     echo
 
-    # Opções do menu
-    echo -e "${BLUE}Menu:${NC}"
-    echo -e "${BLUE}────${NC}"
-
+    # Print menu options
     for i in "${!options[@]}"; do
       if [ $((i % 2)) -eq 0 ]; then
-        local num=$((i / 2 + 1))
-        local cmd="${options[$i]}"
-        local desc="${options[$((i + 1))]}"
-        printf "${BLUE}[%d]${NC} %-10s - %s\n" "$num" "$cmd" "$desc"
+        echo -e "${BLUE}[$((i / 2 + 1))]${NC} ${options[$i]} - ${options[$((i + 1))]}"
       fi
     done
 
     echo
-    echo -e "${BLUE}Opções:${NC}"
-    echo -e "${BLUE}──────${NC}"
-    echo -e "  -v, --verbose   Ativar saída detalhada"
-    echo -e "  -f, --force     Forçar sobrescrita sem confirmação"
-    echo -e "  -h, --help      Mostrar esta ajuda"
+    echo -e "${BLUE}Options:${NC}"
+    echo "  -v, --verbose   Enable verbose output"
+    echo "  -f, --force     Force overwrite without confirmation"
+    echo "  -h, --help      Show this help message"
 
     echo
-    read -p "${BLUE}Escolha uma opção (1-${#options[@]}/2) ou um comando: ${NC}" choice
+    echo -n "${BLUE}Enter your choice (1-5) or option (-v, -f, -h): ${NC}"
+    read -r choice
 
-    # Processar opções de linha de comando
+    # Handle options
     case "$choice" in
     -v | --verbose)
       VERBOSE=1
-      # Continuar para processar o comando
+      continue
       ;;
     -f | --force)
       FORCE=1
-      # Continuar para processar o comando
+      continue
       ;;
     -h | --help)
       usage
-      # Não sair, apenas mostrar ajuda e continuar no menu
-      read -p "Pressione Enter para continuar..."
       continue
-      ;;
-    *)
-      # Se não for uma opção, processar como comando
-      break
       ;;
     esac
-    
-    # Se chegou aqui, processou uma opção e deve continuar para o próximo comando
-    # mas apenas se não estiver no menu interativo
-    if [ -z "$COMMAND" ]; then
-      # Se não tem comando definido, continua no menu
-      continue
-    else
-      # Se já tem um comando, sai para executá-lo
-      break
-    fi
 
-    # Processar escolhas do menu
+    # Handle menu choices
     case "$choice" in
-    [1-5])
-      case $choice in
-      1) COMMAND="init" ;;
-      2) COMMAND="install" ;;
-      3) COMMAND="update" ;;
-      4) COMMAND="list" ;;
-      5)
-        echo -e "${GREEN}Saindo...${NC}"
-        exit 0
-        ;;
-      esac
+    1)
+      COMMAND="init"
       break
       ;;
-    init | install | update | list | exit)
-      if [ "$choice" = "exit" ]; then
-        echo -e "${GREEN}Saindo...${NC}"
-        exit 0
-      fi
-      COMMAND="$choice"
+    2)
+      COMMAND="install"
       break
+      ;;
+    3)
+      COMMAND="update"
+      break
+      ;;
+    4)
+      COMMAND="list"
+      break
+      ;;
+    5)
+      exit 0
       ;;
     *)
-      echo -e "${RED}❌ Opção inválida. Tente novamente.${NC}"
-      sleep 1
+      echo -e "${RED}Invalid choice. Please try again.${NC}"
+      sleep 2
       ;;
     esac
   done
@@ -1314,6 +1256,7 @@ install)
   verify_installation
   ;;
 update)
+  exclude_files
   update_repo
   ;;
 list)
