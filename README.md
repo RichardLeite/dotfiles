@@ -11,6 +11,42 @@ Este repositório contém as configurações pessoais do sistema, incluindo arqu
 - WM (Hyprland)
 - Outros programas (Ax-Shell, cava, etc.)
 
+## 🧪 Testes Automatizados
+
+O projeto inclui testes automatizados para garantir que as funcionalidades principais estejam funcionando corretamente.
+
+### Executando os Testes
+
+Para executar todos os testes:
+
+```bash
+./tests/run-tests.sh
+```
+
+Para executar um teste específico:
+
+```bash
+# Teste de instalação
+./tests/test-install.sh
+
+# Teste de atualização (não interativo)
+./tests/test-update-noninteractive.sh
+```
+
+### Tipos de Testes
+
+1. **Teste de Instalação**
+   - Verifica se os arquivos são instalados corretamente no diretório home
+   - Valida o conteúdo dos arquivos instalados
+
+2. **Teste de Atualização**
+   - Verifica se as alterações nos arquivos são sincronizadas com o repositório
+   - Testa o fluxo de atualização não interativo
+
+### Ambiente de Teste
+
+Os testes são executados em um diretório temporário (`/tmp/dotfiles-test-*`) para evitar modificar os arquivos do sistema do usuário. O ambiente é limpo automaticamente após a execução dos testes.
+
 ## 🚀 Instalação
 
 ### Pré-requisitos

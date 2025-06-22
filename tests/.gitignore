@@ -1,0 +1,17 @@
+# Ignorar diretórios temporários de teste
+/tmp/
+/test-results/
+
+# Ignorar arquivos de saída de teste
+*.log
+*.tmp
+*.bak
+
+# Ignorar arquivos de ambiente
+.env
+
+# Ignorar arquivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo

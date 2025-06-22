@@ -1,0 +1,7 @@
+# Configuração de teste
+ENV=test
+THEME=dark
+EDITOR=nano
+
+# Comentário de exemplo
+# OUTRA_VAR=valor

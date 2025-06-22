@@ -1,0 +1,10 @@
+{
+  "app": "test-app",
+  "version": "1.0.0",
+  "settings": {
+    "theme": "dark",
+    "notifications": true,
+    "autoUpdate": false
+  },
+  "features": ["feature1", "feature2", "feature3"]
+}

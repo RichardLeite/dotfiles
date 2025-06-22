@@ -1,0 +1,174 @@
+{
+  // Editor Settings
+  "editor.fontLigatures": true,
+  "editor.rulers": [
+    80,
+    120
+  ],
+  "editor.renderLineHighlight": "gutter",
+  "editor.fontSize": 14,
+  "editor.fontFamily": "JetBrains Mono",
+  "editor.semanticHighlighting.enabled": true,
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.unicodeHighlight.nonBasicASCII": false,
+  "editor.inlineSuggest.suppressSuggestions": true,
+  "editor.largeFileOptimizations": false,
+  // Formatting and Linting
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "editor.formatOnSave": true,
+  // Language Specific Settings
+  "[scss]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  "[javascript][javascriptreact][typescript][typescriptreact]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "editor.suggestSelection": "recentlyUsed",
+    "editor.suggest.showKeywords": false
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[xml]": {
+    "editor.defaultFormatter": "fabianlauer.vs-code-xml-format"
+  },
+  "[dockercompose]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
+  // Explorer Settings
+  "explorer.compactFolders": false,
+  "symbols.hidesExplorerArrows": false,
+  "explorer.confirmDelete": false,
+  // Workbench Settings
+  "workbench.editor.labelFormat": "short",
+  "workbench.colorTheme": "Dracula Theme",
+  "workbench.iconTheme": "symbols",
+  // Git Settings
+  "git.autofetch": true,
+  "git.enableSmartCommit": true,
+  "git.mergeEditor": true,
+  "git.confirmSync": false,
+  // Terminal Settings
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.env.windows": {},
+  /* "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell"
+    },
+    "Command Prompt": {
+      "path": [
+        "${env:windir}\\Sysnative\\cmd.exe",
+        "${env:windir}\\System32\\cmd.exe"
+      ],
+      "args": [],
+      "icon": "terminal-cmd"
+    },
+    "Git Bash": {
+      "source": "Git Bash"
+    },
+    "Arch (WSL)": {
+      "path": "C:\\Windows\\System32\\wsl.exe",
+      "args": [
+        "-d",
+        "Arch"
+      ]
+    }
+  }, */
+  "terminal.integrated.detectLocale": "on",
+  "terminal.integrated.fontFamily": "'MesloLGS NF', 'monospace', monospace",
+  "terminal.integrated.fontWeight": "bold",
+  "terminal.integrated.env.linux": {},
+  // Other Settings
+  "remote.autoForwardPortsSource": "hybrid",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "breadcrumbs.enabled": false,
+  "githubPullRequests.pullBranch": "never",
+  "cSpell.language": "en,pt-BR,pt",
+  "cSpell.userWords": [
+    "CFOP",
+    "CNAE",
+    "Dotfiles",
+    "toastr",
+    "Workmotor",
+    "Zorin"
+  ],
+  "vscodeGoogleTranslate.preferredLanguage": "English",
+  "security.workspace.trust.untrustedFiles": "open",
+  "vscord.app.name": "Visual Studio Code",
+  "vscord.app.privacyMode.enable": true,
+  "cody.chat.preInstruction": "Answer all my questions in Brazilian Portuguese. If possible, refactor or correct the code, leaving it decoupled and clean code respecting the principles of SOLID",
+  // SQL Tools Settings
+  "sqltools.connections": [
+    {
+      "mysqlOptions": {
+        "authProtocol": "default",
+        "enableSsl": "Disabled"
+      },
+      "previewLimit": 50,
+      "server": "162.214.89.0",
+      "port": 3306,
+      "driver": "MySQL",
+      "name": "[PROD] DEVOSD",
+      "database": "prodosdig",
+      "username": "prodosdig",
+      "password": "ByN!xpXVY?wk"
+    }
+  ],
+  "cody.autocomplete.enabled": true,
+  "cody.autocomplete.formatOnAccept": true,
+  "cody.autocomplete.languages": {
+    "plaintext": true,
+    "*": true
+  },
+  "errorLens.exclude": [
+    "Unknown word"
+  ],
+  "workbench.editor.enablePreview": false,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "quokka.automaticRestart": true
+}
