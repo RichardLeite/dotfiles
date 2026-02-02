@@ -143,4 +143,4 @@ Personal configuration repository. Modify freely for your own use.
 
 ---
 
-**Repository:** v2 branch | **Last updated:** February 2, 2026
+**Repository:** main branch | **Last updated:** February 2, 2026
