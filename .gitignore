@@ -1,0 +1,14 @@
+# Backup directories
+backup/
+
+# System files
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
+
+# Shell script backups
+*.bak
+*.backup
