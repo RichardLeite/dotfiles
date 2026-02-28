@@ -1,5 +1,6 @@
 # Backup directories
 backup/
+wallpapers/
 
 # System files
 .DS_Store
