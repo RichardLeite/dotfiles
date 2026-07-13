@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
-SPEAKER_NAME="HSC-777"
-HEADSET_NAME="H510-PRO"
+# Ordem do ciclo: SPEAKER → HEADPHONE → HEADSET → SPEAKER...
+DEVICES=(
+    "HSC-777|Caixa de Som (HSC-777)|SPEAKER"
+    "HD Audio Controller|Fones de Ouvido (HD Audio Controller)|HEADPHONE"
+    "H510-PRO|Headset (H510-PRO)|HEADSET"
+)
 
 status_output=$(wpctl status)
 
 get_sink_id_by_name() {
     local sink_name="$1"
-
     awk -v sink_name="$sink_name" '
         /Sinks:/ { in_sinks = 1; next }
         in_sinks && /^[[:space:]]*[[:graph:]]+:/ { in_sinks = 0 }
@@ -33,25 +36,50 @@ get_current_sink_id() {
     ' <<< "$status_output"
 }
 
-SPEAKER_SINK=$(get_sink_id_by_name "$SPEAKER_NAME")
-HEADSET_SINK=$(get_sink_id_by_name "$HEADSET_NAME")
-current_sink=$(get_current_sink_id)
+# Construir lista dinâmica de dispositivos disponíveis
+available_ids=()
+available_labels=()
 
-if [ -z "$SPEAKER_SINK" ] || [ -z "$HEADSET_SINK" ]; then
+for entry in "${DEVICES[@]}"; do
+    IFS='|' read -r pattern label _ <<< "$entry"
+    sink_id=$(get_sink_id_by_name "$pattern")
+    if [ -n "$sink_id" ]; then
+        available_ids+=("$sink_id")
+        available_labels+=("$label")
+    fi
+done
+
+# Se nenhum dispositivo disponível, sair silenciosamente
+if [ ${#available_ids[@]} -eq 0 ]; then
     exit 1
 fi
 
-if [ "${current_sink}" = "${HEADSET_SINK}" ]; then
-    new_sink="${SPEAKER_SINK}"
-else
-    new_sink="${HEADSET_SINK}"
+# Se só 1 disponível, notificar e não trocar
+if [ ${#available_ids[@]} -eq 1 ]; then
+    notify-send "Áudio" "${available_labels[0]} (único disponível)"
+    exit 0
 fi
 
-wpctl set-default "${new_sink}"
+current_sink=$(get_current_sink_id)
 
-# Notificação visual da troca de dispositivo
-if [ "${new_sink}" = "${SPEAKER_SINK}" ]; then
-    notify-send "Áudio Alterado" "Caixa de Som (HSC-777)"
-else
-    notify-send "Áudio Alterado" "Headset (H510-PRO)"
+# Encontrar índice do sink atual
+current_idx=-1
+for i in "${!available_ids[@]}"; do
+    if [ "${available_ids[$i]}" = "$current_sink" ]; then
+        current_idx=$i
+        break
+    fi
+done
+
+# Se sink atual não está na lista (ex: Easy Effects), usar índice 0
+if [ "$current_idx" -eq -1 ]; then
+    current_idx=0
 fi
+
+# Avançar para próximo (com wrap-around)
+next_idx=$(( (current_idx + 1) % ${#available_ids[@]} ))
+new_sink="${available_ids[$next_idx]}"
+new_label="${available_labels[$next_idx]}"
+
+wpctl set-default "$new_sink"
+notify-send "Áudio Alterado" "$new_label"
