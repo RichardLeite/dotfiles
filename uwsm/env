@@ -1,0 +1,31 @@
+# =====================================================================
+# uwsm/env
+# Environment variables carregadas pelo preloader do uwsm antes da
+# sessao grafica iniciar (formato: export KEY=VAL).
+# https://wiki.hypr.land/Configuring/Advanced-and-Cool/Environment-variables/
+# uwsm users: theming, xcursor, Nvidia e toolkit ficam aqui (NAO no
+# hyprland.lua). Vars HYPR* e AQ_* ficam em env-hyprland.
+# Symlink criado pelo dotfiles.sh: uwsm/ -> ~/.config/uwsm
+# =====================================================================
+
+# Cursor theme/size (Hyprland + X11)
+export XCURSOR_THEME=Bibata-Modern-Ice
+export XCURSOR_SIZE=24
+
+# Toolkit backends
+export GDK_BACKEND=wayland,x11,*
+export QT_QPA_PLATFORM=wayland;xcb
+export SDL_VIDEODRIVER=wayland
+export LIBVA_DRIVER_NAME=nvidia
+export MOZ_ENABLE_WAYLAND=1
+
+# Qt specifics
+export QT_AUTO_SCREEN_SCALE_FACTOR=1
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+export QT_QPA_PLATFORMTHEME=gtk2
+export QT_STYLE_OVERRIDE=gtk2
+
+# Input method (cedilha/acentuacao via .XCompose)
+export GTK_IM_MODULE=xim
+export QT_IM_MODULE=xim
+export XMODIFIERS=@im=xim
