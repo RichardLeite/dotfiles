@@ -25,8 +25,10 @@ safe_require("monitors")
 safe_require("look-and-feel")
 safe_require("input")
 safe_require("window-rules")
-safe_require("binds")
 safe_require("autostart")
+-- binds depois de autostart: binds.lua faz require("config.autostart")
+-- pra usar M.work_apps() no bind SUPER+SHIFT+W.
+safe_require("binds")
 
 -- Ambsxt (Ax-Shell) - barra/launcher/dashboard
 -- Substitui o `source = ~/.local/share/ambxst/hyprland.conf` que era
