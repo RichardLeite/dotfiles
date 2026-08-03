@@ -13,9 +13,10 @@ Personal configuration files (dotfiles) and setup scripts for my development env
 
 | Item | Purpose |
 |------|---------|
-| `dotfiles.sh` | Main setup script—creates symlinks and manages backups for Hyprland configuration |
+| `dotfiles.sh` | Main setup script—creates symlinks and manages backups for Hyprland and uwsm configuration |
 | `setup-locale.sh` | Locale and keyboard configuration script (requires sudo) |
-| `hypr/` | Hyprland window manager configuration files |
+| `hypr/` | Hyprland window manager configuration files (Lua config) |
+| `uwsm/` | uwsm environment files (`env`, `env-hyprland`) loaded before the graphical session starts |
 | `backup/` | Timestamped backups of previous configurations |
 
 ## 🚀 Quick Start
@@ -30,7 +31,8 @@ chmod +x dotfiles.sh
 This script will:
 
 - Link `hypr/` directory to `~/.config/hypr`
-- Automatically backup any existing Hyprland configuration to `backup/hypr_YYYYMMDD_HHMMSS/`
+- Link `uwsm/` directory to `~/.config/uwsm`
+- Automatically backup any existing configuration to `backup/<name>_YYYYMMDD_HHMMSS/`
 - Use absolute paths for symlinks
 
 ### Optional: Configure locale and keyboard
@@ -45,30 +47,29 @@ Enables `pt_BR.UTF-8` and `en_US.UTF-8` locales with US-International keyboard l
 
 ```
 hypr/
-├── hyprland.conf          # Main Hyprland configuration
-├── hypridle.conf          # Idle behavior settings
-├── hyprlock.conf          # Lock screen configuration
-└── config/                # Modular configuration files
-    ├── autostart.conf
-    ├── binds.conf
-    ├── environment-variables.conf
-    ├── input.conf
-    ├── monitors.conf
-    ├── permissions.conf
-    ├── programs.conf
-    ├── windows-workspaces.conf
-    ├── look-and-feel/     # Visual customization
-    │   ├── animations.conf
-    │   ├── decoration.conf
-    │   ├── dwindle.conf
-    │   ├── general.conf
-    │   ├── index.conf
-    │   ├── master.conf
-    │   ├── misc.conf
-    │   └── workspace.conf
+├── hyprland.lua            # Main Hyprland configuration (Lua entrypoint)
+└── config/                # Modular configuration files (Lua)
+    ├── autostart.lua
+    ├── binds.lua
+    ├── input.lua
+    ├── monitors.lua
+    ├── permissions.lua
+    ├── programs.lua
+    ├── look-and-feel.lua
+    ├── window-rules.lua
     └── scripts/           # Utility scripts
         ├── animated-wallpaper.sh
-        └── audio-ducking.sh
+        ├── audio-ducking.sh
+        └── autostart.sh
+```
+
+`uwsm/` holds environment files sourced by the uwsm preloader before the
+graphical session starts (format: `export KEY=VAL`):
+
+```
+uwsm/
+├── env             # theming, xcursor, toolkit, input method vars
+└── env-hyprland    # HYPR* / AQ_* vars specific to Hyprland
 ```
 
 ## 🔄 Workflow
@@ -113,14 +114,16 @@ Backups are automatically created when running `dotfiles.sh` if an existing conf
 ```
 backup/
 ├── hypr_20250703_124311/  # Example backup from July 3, 2025
-└── hypr_20250704_093045/  # Example backup from July 4, 2025
+├── hypr_20250704_093045/  # Example backup from July 4, 2025
+└── uwsm_20260101_000000/  # Example backup of ~/.config/uwsm
 ```
 
 To restore a previous backup:
 
 ```bash
-rm -rf ~/.config/hypr
+rm -rf ~/.config/hypr ~/.config/uwsm
 cp -r backup/hypr_YYYYMMDD_HHMMSS ~/.config/hypr
+cp -r backup/uwsm_YYYYMMDD_HHMMSS ~/.config/uwsm
 ```
 
 ## ⚙️ Requirements
