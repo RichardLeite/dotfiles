@@ -2,6 +2,9 @@
 backup/
 wallpapers/
 
+# Hyprland autostart logs
+hypr/logs/
+
 # System files
 .DS_Store
 .vscode/
