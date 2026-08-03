@@ -2,6 +2,12 @@
 backup/
 wallpapers/
 
+# Hyprland autostart logs
+hypr/logs/
+
+# Lua migration backups
+hypr/.backup-lua-migration-*/
+
 # System files
 .DS_Store
 .vscode/

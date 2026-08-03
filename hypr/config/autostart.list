@@ -1,0 +1,37 @@
+# =====================================================================
+# config/autostart.list
+# Comandos de autostart executados no evento `hyprland.start`.
+# Uma linha = um comando (async, via hl.exec_cmd). Linhas comecando
+# com '#' sao comentarios; linhas vazias sao ignoradas.
+# Itens que precisam de delay ficam no autostart.sh (lock/bluetooth).
+# =====================================================================
+
+# XSettings Daemon (requer pacote xsettingsd instalado)
+# -c aponta pro config real (default do xsettingsd e' ~/.xsettingsd)
+xsettingsd -c ~/.config/xsettingsd/xsettingsd.conf
+
+# System environment (propaga env pro D-Bus/systemd)
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+
+# PolicyKit authentication agent
+/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+# Network Manager
+nm-applet &
+
+# Ponte X11 -> SNI (Wine/Proton tray). Janela orfa escondida via
+# windowrule no window-rules.lua.
+bash -c 'sleep 3; while true; do xembedsniproxy 2>/dev/null; sleep 5; done' &
+
+# GNOME Keyring
+/usr/bin/gnome-keyring-daemon --start --components=secrets,ssh,pkcs11
+
+# RGB
+openrgb --profile Red.orp
+
+# Noise cancellation
+noisetorch -i
+
+# Itens com delay (lock 5s, bluetooth 10s) -> script com log
+~/.config/hypr/config/scripts/autostart.sh

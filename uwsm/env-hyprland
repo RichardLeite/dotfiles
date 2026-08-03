@@ -1,0 +1,10 @@
+# =====================================================================
+# uwsm/env-hyprland
+# Variaveis HYPR* e AQ_* especificas do Hyprland, carregadas pelo
+# preloader do uwsm antes da sessao iniciar.
+# https://wiki.hypr.land/Configuring/Advanced-and-Cool/Environment-variables/
+# =====================================================================
+
+# Hyprcursor theme/size (cursor do proprio Hyprland)
+export HYPRCURSOR_THEME=Bibata-Modern-Ice
+export HYPRCURSOR_SIZE=24
